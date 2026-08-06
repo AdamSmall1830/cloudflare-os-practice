@@ -36,7 +36,8 @@ describe("generateFiles", () => {
 
   it("metrics log carries the hours and dollar anchor", () => {
     const met = files.find((f) => f.path === "METRICS.md")!;
-    expect(met.content).toContain("~51 hrs/month ≈ $3060/month");
+    expect(met.content).toContain("~51 hrs/month ≈ $3,060/month");
+    expect(met.content).toContain("at $60/hr loaded");
   });
 
   it("only scaffolds custom systems, never stock ones", () => {

@@ -368,6 +368,8 @@ function showCopyModal(txt){
   const t = ov.querySelector("textarea"); t.focus(); t.select();
 }
 function clampNum(v, min, max, dflt){ const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : dflt; }
+function fmtNum(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+function effectiveRate(rate){ const n = Number(rate); return Number.isFinite(n) && n > 0 ? Math.round(n) : 50; }
 
 /* =============================== header =============================== */
 function renderHeader(){
@@ -788,11 +790,12 @@ function designModel(){
   const suggested = ranked.filter(u=>u.risk!=="C").slice(0,5);
   if (!pilots.length) pilots = suggested;
   const totalHrs = Math.round(pilots.reduce((a,u)=>a+u.hrsMo,0));
-  const totalVal = Math.round(totalHrs * (c.hourlyRate||50));
+  const rate = effectiveRate(c.hourlyRate);
+  const totalVal = totalHrs * rate;
   const small = Number(c.size||0) > 0 && Number(c.size) <= 30;
   const intWeeks = Math.max(2, Math.ceil(custom.length*1.5));
   const weeks = (small?2:3) + 1 + intWeeks + 3 + (Number(c.size)>100?4:3) + 2;
-  return { c, chosen, stock, custom, ranked, pilots, suggested, totalHrs, totalVal, weeks, small, intWeeks };
+  return { c, chosen, stock, custom, ranked, pilots, suggested, totalHrs, totalVal, rate, weeks, small, intWeeks };
 }
 
 function scopeMarkdown(m){
@@ -806,7 +809,7 @@ Deploy Cloudflare OS as a governed AI agent workspace in ${c.name}'s own Cloudfl
 ## Pilot workflows (${m.pilots.length})
 ${m.pilots.map(u=>`- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo)} hrs/month recovered · risk tier ${u.risk}`).join("\n")}
 
-Estimated recoverable time across pilot: **~${m.totalHrs} hours/month ≈ $${m.totalVal}/month** at a $${c.hourlyRate||50}/hr loaded rate.
+Estimated recoverable time across pilot: **~${m.totalHrs} hours/month ≈ $${fmtNum(m.totalVal)}/month** at a $${m.rate}/hr loaded rate.
 
 ## Integrations
 | System | Type | Wave | Build effort |
@@ -844,7 +847,7 @@ function renderDesign(){
 
   <div class="card"><h3>Pilot charter <span class="tag">${c.useCases.some(u=>u.pilot) ? "your manual pilot selection" : "auto-suggested: top 5 by value × feasibility, C-risk excluded — tick Pilot boxes in Discovery to override"}</span></h3>
     <div class="tbl"><table><thead><tr><th>Workflow</th><th>Dept</th><th>Hrs/mo</th><th>Risk</th><th>Systems</th></tr></thead><tbody>${pilotRows || '<tr><td colspan="5" class="empty">Add use cases in Discovery.</td></tr>'}</tbody></table></div>
-    <p style="margin:0.6rem 0 0"><strong>~${m.totalHrs} hours/month ≈ $${m.totalVal.toLocaleString()}/month</strong> of recoverable value across the pilot set (at $${c.hourlyRate||50}/hr loaded) — this is your anchor for pricing and for the pilot's METRICS log.</p>
+    <p style="margin:0.6rem 0 0"><strong>~${m.totalHrs} hours/month ≈ $${fmtNum(m.totalVal)}/month</strong> of recoverable value across the pilot set (at $${m.rate}/hr loaded) — this is your anchor for pricing and for the pilot's METRICS log.</p>
   </div>
 
   <div class="card"><h3>Integration map <span class="tag">${m.stock.length} stock · ${m.custom.length} custom gatekeepers</span></h3>

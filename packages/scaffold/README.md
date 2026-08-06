@@ -21,12 +21,19 @@ Input: a Studio **Export** file — `{"client": {...}}` — or a bare `ClientRec
 out/<slug>/
 ├── deployment.jsonc                    # starter-template values, client's real hostname/account
 ├── SETUP.md                            # the full numbered build guide with acceptance checks
+├── EVALS.md                            # eval run protocol: pre-pilot gate + release-bump regression
+├── METRICS.md                          # pilot ROI log, anchored to the design's hours/$ estimate
+├── SECURITY-BASELINE.md                # credential inventory, approval map, incident runbook
 ├── README.md                           # what this seed is and how to use it
+├── evals/
+│   ├── platform.json                   # universal red-team suite (all blockers)
+│   └── <use-case>.json                 # golden + approval cases per pilot workflow
 ├── packages/custom-gatekeeper/src/
 │   ├── ghl.ts                          # one scaffold per *custom* system in the record
 │   └── …                               # (stock systems need config, not code — none emitted)
 └── skills/
-    └── <use-case>.md                   # one skill seed per pilot use case, ready for Phase 4
+    └── <use-case>.md                   # one 7-part skill seed per pilot use case
+                                        # (craft rules: docs/skills-guide.md)
 ```
 
 Approver names from the record are threaded into the gatekeeper scaffolds (payment approver into

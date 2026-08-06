@@ -43,7 +43,7 @@ describe("scopeMarkdown", () => {
   it("renders a deterministic proposal document", () => {
     const md = scopeMarkdown(designModel(hqClient()), { date: "2026-08-06" });
     expect(md).toContain("# Our Firm — Cloudflare OS HQ — Cloudflare OS Deployment: Proposed Scope");
-    expect(md).toContain("~51 hours/month ≈ $3060/month** at a $60/hr loaded rate");
+    expect(md).toContain("~51 hours/month ≈ $3,060/month** at a $60/hr loaded rate");
     expect(md).toContain("| GoHighLevel (CRM · funnels · booking · payments) | Custom gatekeeper (OAuth SaaS REST) | 2 | 1–2 weeks |");
     expect(md).toContain("payments → Adam (Principal)");
   });
@@ -52,5 +52,28 @@ describe("scopeMarkdown", () => {
     const c = blankClient("X Co");
     const md = scopeMarkdown(designModel(c), { date: "2026-08-06" });
     expect(md).toContain("payments → TBD");
+  });
+});
+
+describe("ROI rate handling", () => {
+  it("computes totalValue = totalHrs × rate on the HQ record", () => {
+    const m = designModel(hqClient());
+    expect(m.hourlyRate).toBe(60);
+    expect(m.totalValue).toBe(m.totalHrs * 60);
+  });
+
+  it("falls back to $50 for zero, negative, missing, or garbage rates", () => {
+    for (const bad of [0, -20, undefined, NaN, "nope"]) {
+      const c = { ...hqClient(), hourlyRate: bad as number };
+      const m = designModel(c);
+      expect(m.hourlyRate).toBe(50);
+      expect(m.totalValue).toBe(m.totalHrs * 50);
+    }
+  });
+
+  it("rounds fractional rates and keeps values non-negative", () => {
+    const m = designModel({ ...hqClient(), hourlyRate: 62.5 });
+    expect(m.hourlyRate).toBe(63);
+    expect(m.totalValue).toBeGreaterThan(0);
   });
 });

@@ -142,6 +142,8 @@ export interface DesignModel {
   totalHrs: number;
   /** totalHrs × hourlyRate — the dollar value anchor per month. */
   totalValue: number;
+  /** The effective loaded hourly rate used for totalValue (invalid inputs fall back to $50). */
+  hourlyRate: number;
   /** Estimated engagement length in weeks. */
   weeks: number;
   /** Integration-phase weeks. */

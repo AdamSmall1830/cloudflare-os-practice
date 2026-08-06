@@ -4,6 +4,7 @@ import {
   designModel,
   evalRunMarkdown,
   evalSuites,
+  fmtNum,
   gatekeeperScaffold,
   slug,
   systemById,
@@ -52,7 +53,7 @@ function metricsMarkdown(c: ClientRecord): string {
   const m = designModel(c);
   return `# ${c.name} — Pilot Metrics Log
 
-Anchor from the design: **~${m.totalHrs} hrs/month ≈ $${m.totalValue}/month** across ${m.pilots.length} pilot workflows (at $${c.hourlyRate || 50}/hr loaded). Capture weekly during pilot; review in the weekly tuning session; roll up monthly for the governance council.
+Anchor from the design: **~${m.totalHrs} hrs/month ≈ $${fmtNum(m.totalValue)}/month** across ${m.pilots.length} pilot workflows (at $${m.hourlyRate}/hr loaded). Capture weekly during pilot; review in the weekly tuning session; roll up monthly for the governance council.
 
 ## Weekly capture
 | Week | Workflow | Runs | Est. hrs saved | Approval latency (median) | Errors / rework | Notes |

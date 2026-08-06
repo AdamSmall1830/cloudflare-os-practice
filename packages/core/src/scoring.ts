@@ -26,6 +26,17 @@ export function clampNum(v: unknown, min: number, max: number, dflt: number): nu
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : dflt;
 }
 
+/** Deterministic thousands separators (locale-independent): 3060 → "3,060". */
+export function fmtNum(n: number): string {
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/** Effective hourly rate: finite and positive wins (rounded); anything else → $50 default. */
+export function effectiveRate(rate: unknown): number {
+  const n = Number(rate);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 50;
+}
+
 /** Kebab-case slug for hostnames, worker names, and filenames. */
 export function slug(s: string | undefined | null): string {
   const out = (s ?? "client")

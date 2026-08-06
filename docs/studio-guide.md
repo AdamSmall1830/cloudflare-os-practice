@@ -31,6 +31,7 @@ Drives everything downstream — fill it first.
 - **Domain already on Cloudflare?** → switches the DNS step between "nothing to migrate" and full nameserver-move instructions.
 - **Sign-in method** → branches the Build Guide: Cloudflare Access + IdP (recommended), Google OAuth (small Workspace shops), or password (flagged as interim-only).
 - **Model provider / daily LLM calls** → the AI Gateway step's env block (`DAILY_LLM_CALL_LIMIT`) and the model matrix in Design.
+- **Loaded hourly rate ($)** → converts the pilot's recovered hours into a dollar anchor on the Design tab, in the scope doc, and in the scaffolded `METRICS.md`. Invalid or empty values fall back to $50.
 - **Approvers (payments / sends / records)** → threaded into the policy matrix, the gatekeeper scaffolds, and the pilot-readiness gate. Leave one empty and the guide shows "⚠ unset".
 
 ### Systems inventory
@@ -85,7 +86,7 @@ The personalized setup runbook — every step numbered, with copy-paste blocks a
 - Missing profile inputs (domain, account ID) are flagged at the top; placeholders appear until filled.
 - PHI-touching systems (EMR, clearinghouse) carry a hard **"STOP unless BAAs are signed"** gate.
 
-The same guide ships as `SETUP.md` when you run the export through `cfos-scaffold` — useful for handing a runbook to a client's IT or a subcontractor.
+The same guide ships as `SETUP.md` when you run the export through `cfos-scaffold` — alongside the eval suites (`evals/` + `EVALS.md`), the pilot ROI log (`METRICS.md`), and the security baseline with incident runbook (`SECURITY-BASELINE.md`). One export produces the whole deployment kit.
 
 ---
 

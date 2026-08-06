@@ -1,5 +1,5 @@
 import { SYSTEMS, VERTICALS } from "./catalogs.js";
-import { rankUseCases } from "./scoring.js";
+import { effectiveRate, fmtNum, rankUseCases } from "./scoring.js";
 import type { ClientRecord, DesignModel } from "./types.js";
 
 /** Hostname for the production workspace ("os.<domain>", placeholder when unknown). */
@@ -31,7 +31,8 @@ export function designModel(client: ClientRecord): DesignModel {
   const pilots = autoSuggested ? suggested : manual;
 
   const totalHrs = Math.round(pilots.reduce((a, u) => a + u.hrsMo, 0));
-  const totalValue = Math.round(totalHrs * (client.hourlyRate || 50));
+  const hourlyRate = effectiveRate(client.hourlyRate);
+  const totalValue = totalHrs * hourlyRate;
 
   const size = Number(client.size || 0);
   const small = size > 0 && size <= 30;
@@ -50,6 +51,7 @@ export function designModel(client: ClientRecord): DesignModel {
     autoSuggested,
     totalHrs,
     totalValue,
+    hourlyRate,
     weeks,
     intWeeks,
     discoveryWeeks,
@@ -77,7 +79,7 @@ Deploy Cloudflare OS as a governed AI agent workspace in ${c.name}'s own Cloudfl
 ## Pilot workflows (${m.pilots.length})
 ${m.pilots.map((u) => `- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo)} hrs/month recovered · risk tier ${u.risk}`).join("\n")}
 
-Estimated recoverable time across pilot: **~${m.totalHrs} hours/month ≈ $${m.totalValue}/month** at a $${c.hourlyRate || 50}/hr loaded rate.
+Estimated recoverable time across pilot: **~${m.totalHrs} hours/month ≈ $${fmtNum(m.totalValue)}/month** at a $${m.hourlyRate}/hr loaded rate.
 
 ## Integrations
 | System | Type | Wave | Build effort |

@@ -28,6 +28,13 @@ describe("scoring", () => {
     expect(clampNum("nope", 1, 5, 3)).toBe(3);
   });
 
+  it("formats numbers deterministically with thousands separators", async () => {
+    const { fmtNum } = await import("../src/scoring.js");
+    expect(fmtNum(3060)).toBe("3,060");
+    expect(fmtNum(999)).toBe("999");
+    expect(fmtNum(1234567)).toBe("1,234,567");
+  });
+
   it("slugs names safely, capped at 24 chars", () => {
     expect(slug("Our Firm — Cloudflare OS HQ")).toBe("our-firm-cloudflare-os-h");
     expect(slug("Acme Co.")).toBe("acme-co");
