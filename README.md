@@ -1,5 +1,7 @@
 # Cloudflare OS Practice
 
+[![CI](https://github.com/AdamSmall1830/cloudflare-os-practice/actions/workflows/ci.yml/badge.svg)](https://github.com/AdamSmall1830/cloudflare-os-practice/actions/workflows/ci.yml)
+
 The delivery toolkit for our Cloudflare OS implementation business: taking client companies from discovery through design to a deployed, governed AI agent workspace ([Cloudflare OS](https://github.com/cloudflare/cloudflare-os)) in their own Cloudflare account.
 
 ## Documentation
@@ -12,6 +14,7 @@ The delivery toolkit for our Cloudflare OS implementation business: taking clien
 | [packages/core/README.md](packages/core/README.md) | The engine's API, invariants, and its relationship to the Studio |
 | [packages/scaffold/README.md](packages/scaffold/README.md) | The `cfos-scaffold` CLI — input format and generated files |
 | [workers/ai-proxy/README.md](workers/ai-proxy/README.md) | Deploying the AI endpoint securely |
+| [docs/forking.md](docs/forking.md) | **Fork this repo and make it your own practice** — the full make-it-yours checklist and the honest ledger of what's included |
 
 ## Architecture
 
@@ -40,10 +43,10 @@ pnpm install
 pnpm check          # build + test everything
 ```
 
-Generate a deployment seed from a Studio export:
+Generate a deployment seed from a Studio export (an example export ships in `examples/`):
 
 ```bash
-pnpm scaffold path/to/cfos-client.json
+pnpm scaffold examples/hq-export.json
 # → out/<client-slug>/{deployment.jsonc, SETUP.md, packages/custom-gatekeeper/src/*.ts, skills/*.md}
 ```
 
@@ -54,7 +57,7 @@ python3 -m http.server 8080
 # → http://localhost:8080/studio/
 ```
 
-Published (private) artifact copies: [Studio](https://claude.ai/code/artifact/3f91850f-1686-4911-9218-41c2809d5917) · [Playbook](https://claude.ai/code/artifact/c62fb867-9d1a-4da1-ba84-3c12644b132f)
+Published (internal — our private hosted copies; forkers host their own, see [docs/forking.md](docs/forking.md)): [Studio](https://claude.ai/code/artifact/3f91850f-1686-4911-9218-41c2809d5917) · [Playbook](https://claude.ai/code/artifact/c62fb867-9d1a-4da1-ba84-3c12644b132f)
 
 ## Using the engine
 

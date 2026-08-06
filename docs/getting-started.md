@@ -22,11 +22,13 @@ The delivery method itself — phases, instruments, pricing, vertical playbooks 
 Requirements: Node ≥ 20, pnpm ≥ 9.
 
 ```bash
-git clone https://github.com/AdamSmall1830/cloudflare-os-practice.git
+git clone https://github.com/AdamSmall1830/cloudflare-os-practice.git   # or your fork
 cd cloudflare-os-practice
 pnpm install
 pnpm check        # builds all packages, runs all tests
 ```
+
+(Forking to run your own practice? The make-it-yours checklist is [forking.md](forking.md).)
 
 The canonical logic lives in [`packages/core`](../packages/core) — typed, pure, tested. Start there:
 
@@ -42,9 +44,12 @@ console.log(buildSteps(client).length);  // ordered setup steps with acceptance 
 To turn a Studio export into a deployment seed (filled `deployment.jsonc`, `SETUP.md`, gatekeeper scaffolds, skill seeds):
 
 ```bash
-pnpm scaffold path/to/cfos-client.json
+pnpm scaffold examples/hq-export.json    # try it immediately with the bundled example
+pnpm scaffold path/to/cfos-client.json   # or a real Studio export
 # → out/<client-slug>/
 ```
+
+(The `scaffold` script builds its dependencies first, so it works on a fresh clone.)
 
 Details: [packages/core/README.md](../packages/core/README.md) · [packages/scaffold/README.md](../packages/scaffold/README.md)
 

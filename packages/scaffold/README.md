@@ -7,7 +7,8 @@ to begin a build. This is the bridge from "design captured" to "repo ready".
 ## Usage
 
 ```bash
-# from the repo root (builds run via the workspace):
+# from the repo root (the script builds its dependencies first):
+pnpm scaffold examples/hq-export.json            # bundled example → out/our-firm-cloudflare-os-h/
 pnpm scaffold path/to/cfos-client.json           # → out/<client-slug>/
 pnpm scaffold path/to/cfos-client.json -o mydir  # explicit output dir
 ```
