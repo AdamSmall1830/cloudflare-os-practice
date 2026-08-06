@@ -1,0 +1,16 @@
+{
+  "name": "cloudflare-os-practice",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Delivery toolkit for a Cloudflare OS implementation practice: typed engine, scaffold CLI, AI proxy Worker, Studio cockpit, and the client delivery playbook.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "check": "pnpm -r build && pnpm -r test",
+    "scaffold": "node packages/scaffold/dist/cli.js"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@cfos-practice/ai-proxy",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cloudflare Worker that proxies Studio AI-assist requests to the Anthropic API. The provider key lives in a Worker secret; the browser never sees it.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "test": "echo \"no tests (deploy target)\"",
+    "deploy": "wrangler deploy",
+    "secret": "wrangler secret put ANTHROPIC_API_KEY"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

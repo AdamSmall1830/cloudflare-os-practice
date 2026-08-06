@@ -1,0 +1,26 @@
+{
+  "name": "@cfos-practice/core",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The engine behind Cloudflare OS Studio: client schema, catalogs, design/scope generator, build-guide generator, and AI-assist prompt/ingest.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  // Deploy with: pnpm --filter @cfos-practice/ai-proxy deploy
+  // Then set the secret: pnpm --filter @cfos-practice/ai-proxy secret
+  "name": "cfos-ai-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "vars": {
+    // Lock CORS to the origin that hosts the Studio. "*" only for local testing.
+    "ALLOWED_ORIGIN": "https://studio.yourfirm.com",
+    "MODEL": "claude-sonnet-5"
+  }
+  // Recommended: put Cloudflare Access in front of this Worker's route as well —
+  // CORS is not authentication.
+}
