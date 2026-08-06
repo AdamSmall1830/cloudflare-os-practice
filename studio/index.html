@@ -1,0 +1,1121 @@
+<meta charset="utf-8">
+<title>Cloudflare OS Studio</title>
+<style>
+  :root {
+    --paper:#F6F5F2; --surface:#FFFFFF; --ink:#211D18; --ink-soft:#5C554C; --line:#DDD8D0;
+    --ember:#D14E00; --ember-soft:#FBEDE3; --slate:#44607A; --slate-soft:#E9EEF3;
+    --moss:#3E7A4E; --moss-soft:#E7F0E9; --warn:#9A6B12; --warn-soft:#F7EEDB;
+    --mono:"SF Mono",ui-monospace,"Cascadia Code",Consolas,monospace;
+    --display:Futura,"Century Gothic","URW Gothic","Avenir Next","Segoe UI",sans-serif;
+    --body:"Avenir Next",Avenir,Seravek,"Segoe UI",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --paper:#171412; --surface:#201C18; --ink:#EAE5DE; --ink-soft:#A89F93; --line:#38322B;
+    --ember:#FF8A3D; --ember-soft:#33241A; --slate:#8FB0CC; --slate-soft:#1E2831;
+    --moss:#7FB58D; --moss-soft:#1D2A20; --warn:#D9A94A; --warn-soft:#2E2717; } }
+  :root[data-theme="dark"] {
+    --paper:#171412; --surface:#201C18; --ink:#EAE5DE; --ink-soft:#A89F93; --line:#38322B;
+    --ember:#FF8A3D; --ember-soft:#33241A; --slate:#8FB0CC; --slate-soft:#1E2831;
+    --moss:#7FB58D; --moss-soft:#1D2A20; --warn:#D9A94A; --warn-soft:#2E2717; }
+  :root[data-theme="light"] {
+    --paper:#F6F5F2; --surface:#FFFFFF; --ink:#211D18; --ink-soft:#5C554C; --line:#DDD8D0;
+    --ember:#D14E00; --ember-soft:#FBEDE3; --slate:#44607A; --slate-soft:#E9EEF3;
+    --moss:#3E7A4E; --moss-soft:#E7F0E9; --warn:#9A6B12; --warn-soft:#F7EEDB; }
+
+  * { box-sizing:border-box; }
+  body { background:var(--paper); color:var(--ink); font-family:var(--body); margin:0; font-size:15px; line-height:1.55; }
+  .app { max-width:74rem; margin:0 auto; padding:0 1rem 5rem; }
+
+  /* Header */
+  .hdr { display:flex; flex-wrap:wrap; gap:0.8rem 1.4rem; align-items:center; padding:1.1rem 0 0.9rem; border-bottom:3px solid var(--ink); }
+  .brand { font-family:var(--display); font-size:1.15rem; letter-spacing:0.04em; }
+  .brand .dot { color:var(--ember); }
+  .brand small { display:block; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.16em; color:var(--ink-soft); }
+  .hdr .spacer { flex:1; }
+  select, input[type=text], input[type=number], input[type=date], textarea {
+    font-family:var(--body); font-size:0.9rem; color:var(--ink); background:var(--surface);
+    border:1px solid var(--line); padding:0.45rem 0.6rem; border-radius:4px; max-width:100%;
+  }
+  textarea { width:100%; resize:vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline:2px solid var(--ember); outline-offset:1px; }
+  button { font-family:var(--display); font-size:0.74rem; text-transform:uppercase; letter-spacing:0.1em;
+    background:var(--surface); color:var(--ink); border:1px solid var(--line); padding:0.5rem 0.85rem; border-radius:4px; cursor:pointer; }
+  button:hover { border-color:var(--ember); color:var(--ember); }
+  button.primary { background:var(--ember); border-color:var(--ember); color:var(--paper); }
+  button.primary:hover { opacity:0.9; color:var(--paper); }
+  button.ghost { border:none; background:none; padding:0.3rem 0.4rem; }
+  button.danger:hover { border-color:#B3391B; color:#B3391B; }
+
+  /* Phase tabs */
+  .tabs { display:flex; gap:0; margin:1.1rem 0 1.4rem; border:1px solid var(--line); background:var(--surface); overflow-x:auto; }
+  .tabs button { flex:1; border:none; border-right:1px solid var(--line); border-radius:0; padding:0.75rem 0.9rem; white-space:nowrap; }
+  .tabs button:last-child { border-right:none; }
+  .tabs button .n { color:var(--ember); margin-right:0.45rem; }
+  .tabs button.active { background:var(--ember); color:var(--paper); }
+  .tabs button.active .n { color:var(--paper); }
+
+  h2 { font-family:var(--display); font-size:1.2rem; letter-spacing:0.02em; margin:1.6rem 0 0.3rem; }
+  h2 + .hint { margin-top:0; }
+  .hint { color:var(--ink-soft); font-size:0.88rem; margin:0.1rem 0 0.9rem; max-width:56rem; }
+  .card { background:var(--surface); border:1px solid var(--line); padding:1.1rem 1.2rem; margin:0 0 1.1rem; }
+  .card h3 { font-family:var(--display); font-size:0.95rem; margin:0 0 0.7rem; letter-spacing:0.03em; }
+  .card h3 .tag { font-family:var(--mono); font-size:0.66rem; color:var(--ink-soft); font-weight:400; margin-left:0.5rem; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr)); gap:0.7rem 1.1rem; }
+  .field label { display:block; font-family:var(--display); font-size:0.64rem; text-transform:uppercase; letter-spacing:0.13em; color:var(--slate); margin-bottom:0.2rem; }
+  .field input, .field select { width:100%; }
+  .checks { display:grid; grid-template-columns:repeat(auto-fill,minmax(14rem,1fr)); gap:0.25rem 1rem; }
+  .checks label { display:flex; gap:0.5rem; align-items:baseline; font-size:0.9rem; cursor:pointer; }
+  .checks input { accent-color:var(--ember); }
+  .pill { display:inline-block; font-family:var(--mono); font-size:0.62rem; padding:0.05rem 0.45rem; border:1px solid var(--line); border-radius:99px; color:var(--ink-soft); }
+  .pill.stock { border-color:var(--moss); color:var(--moss); }
+  .pill.custom { border-color:var(--ember); color:var(--ember); }
+  .pill.tierA { border-color:var(--moss); color:var(--moss); }
+  .pill.tierB { border-color:var(--warn); color:var(--warn); }
+  .pill.tierC { border-color:#B3391B; color:#B3391B; }
+
+  .tbl { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:0.88rem; }
+  th { font-family:var(--display); text-align:left; font-size:0.64rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--ink-soft); padding:0.45rem 0.6rem; border-bottom:2px solid var(--ink); white-space:nowrap; }
+  td { padding:0.45rem 0.6rem; border-bottom:1px solid var(--line); vertical-align:top; }
+  .num { font-variant-numeric:tabular-nums; text-align:right; }
+  td input[type=number] { width:4.2rem; }
+  td input[type=text] { min-width:8rem; }
+
+  .empty { color:var(--ink-soft); font-size:0.88rem; padding:0.6rem 0; font-style:italic; }
+  .row-actions button { font-size:0.62rem; padding:0.25rem 0.5rem; }
+
+  /* Build guide */
+  .step { display:grid; grid-template-columns:2.4rem 1fr; gap:0.9rem; padding:1.1rem 0; border-bottom:1px solid var(--line); }
+  .step-num { width:2rem; height:2rem; border:2px solid var(--ember); color:var(--ember); display:flex; align-items:center; justify-content:center; font-family:var(--display); font-size:0.95rem; }
+  .step.done .step-num { background:var(--moss); border-color:var(--moss); color:var(--paper); }
+  .step h3 { font-family:var(--display); font-size:1rem; margin:0.1rem 0 0.45rem; display:flex; align-items:center; gap:0.7rem; flex-wrap:wrap; }
+  .step h3 label { font-family:var(--body); font-size:0.75rem; color:var(--ink-soft); display:flex; gap:0.35rem; align-items:center; cursor:pointer; text-transform:none; letter-spacing:0; font-weight:400; }
+  .step h3 input { accent-color:var(--moss); }
+  .step-body { max-width:52rem; font-size:0.92rem; }
+  .step-body ol, .step-body ul { padding-left:1.2rem; margin:0.4rem 0 0.7rem; }
+  .step-body li { margin-bottom:0.25rem; }
+  .step-body li::marker { color:var(--ember); }
+  .codeblock { position:relative; margin:0.6rem 0 0.8rem; }
+  .codeblock pre { background:#211D18; color:#EFE9E0; font-family:var(--mono); font-size:0.78rem; line-height:1.5; padding:0.85rem 1rem; overflow-x:auto; margin:0; border-radius:4px; }
+  :root[data-theme="dark"] .codeblock pre { background:#0F0D0B; border:1px solid var(--line); }
+  .codeblock .copy { position:absolute; top:0.45rem; right:0.45rem; font-size:0.6rem; padding:0.25rem 0.55rem; background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.3); }
+  .codeblock .copy:hover { border-color:#fff; color:#fff; }
+  .verify { background:var(--moss-soft); border-left:3px solid var(--moss); padding:0.5rem 0.8rem; font-size:0.85rem; margin-top:0.5rem; }
+  .verify b { color:var(--moss); font-family:var(--display); font-size:0.62rem; text-transform:uppercase; letter-spacing:0.12em; display:block; }
+  .note { background:var(--slate-soft); border-left:3px solid var(--slate); padding:0.5rem 0.8rem; font-size:0.85rem; margin:0.5rem 0; }
+  .note b { color:var(--slate); }
+  .warnbox { background:var(--warn-soft); border-left:3px solid var(--warn); padding:0.5rem 0.8rem; font-size:0.85rem; margin:0.5rem 0; }
+  .inline-input { display:inline-block; }
+  .inline-input input { font-family:var(--mono); font-size:0.8rem; }
+
+  .progress { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:0.6rem 0 0.2rem; }
+  .progress i { display:block; height:100%; background:var(--moss); transition:width 0.25s; }
+  @media (prefers-reduced-motion: reduce) { .progress i { transition:none; } }
+
+  .intro { border-left:4px solid var(--ember); }
+  .intro ol { margin:0.3rem 0 0.7rem; }
+  .intro .dismiss { float:right; }
+  button[disabled] { opacity:0.5; cursor:default; }
+  .ai-opt { font-family:var(--display); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.13em; color:var(--ember); margin:0.9rem 0 0.35rem; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:1rem; }
+  .modal { background:var(--surface); border:1px solid var(--line); padding:1.1rem 1.2rem; max-width:38rem; width:100%; }
+  .modal h3 { font-family:var(--display); font-size:0.9rem; margin:0 0 0.5rem; }
+  .modal textarea { font-family:var(--mono); font-size:0.75rem; }
+  .toast { position:fixed; bottom:1.2rem; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--paper); font-family:var(--display); font-size:0.72rem; letter-spacing:0.1em; text-transform:uppercase; padding:0.55rem 1.1rem; border-radius:4px; opacity:0; pointer-events:none; transition:opacity 0.2s; z-index:50; }
+  .toast.show { opacity:1; }
+  .qa { margin-bottom:0.8rem; }
+  .qa .q { font-size:0.85rem; font-weight:600; margin-bottom:0.2rem; }
+  details { border:1px solid var(--line); background:var(--surface); margin-bottom:0.7rem; }
+  details summary { cursor:pointer; padding:0.6rem 0.9rem; font-family:var(--display); font-size:0.85rem; letter-spacing:0.03em; }
+  details[open] summary { border-bottom:1px solid var(--line); }
+  details .inner { padding:0.8rem 0.9rem; }
+</style>
+
+<div class="app">
+  <header class="hdr">
+    <div class="brand">Cloudflare OS <span class="dot">Studio</span><small>Discovery → Design → Build · vendor cockpit</small></div>
+    <div class="spacer"></div>
+    <select id="clientSel" aria-label="Active client"></select>
+    <button id="btnNew" title="Start a new client engagement">+ New client</button>
+    <button id="btnExport" title="Download this client's data as JSON (backup / move machines)">Export</button>
+    <button id="btnImport" title="Load a previously exported client JSON">Import</button>
+    <button id="btnDelete" class="danger" title="Delete the selected client permanently">Delete</button>
+  </header>
+
+  <nav class="tabs" aria-label="Phases">
+    <button data-tab="discovery" class="active"><span class="n">1</span>Discovery</button>
+    <button data-tab="design"><span class="n">2</span>Design &amp; Scope</button>
+    <button data-tab="build"><span class="n">3</span>Build Guide</button>
+  </nav>
+
+  <main id="view"></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<input type="file" id="importFile" accept="application/json" style="display:none">
+
+<script>
+/* =============================== catalogs =============================== */
+const IQ = [
+  "Walk me through yesterday morning, task by task.",
+  "What do you redo every week or month that feels identical each time?",
+  "What takes a new hire longest to learn?",
+  "Which emails or messages do you dread, and why?",
+  "What information lives only in one person's head?",
+  "What reports do you produce — for whom, from which systems, how often?",
+  "Where do you wait on approvals, and how long?",
+  "Between which systems do you re-key the same data?",
+  "If you got five hours back a week, what would you spend them on?",
+  "What should NEVER be automated here?"
+];
+
+const SYS = [
+  { id:"google",     label:"Google Workspace (mail · calendar · Drive)", kind:"stock",  wave:1, effort:"0.5–1 day" },
+  { id:"m365",       label:"Microsoft 365 (Graph)",                      kind:"custom", cls:"Graph", wave:1, effort:"5–10 days" },
+  { id:"slack",      label:"Slack",                                      kind:"stock",  wave:1, effort:"0.5 day" },
+  { id:"notion",     label:"Notion",                                     kind:"stock",  wave:1, effort:"0.5 day" },
+  { id:"confluence", label:"Confluence",                                 kind:"stock",  wave:1, effort:"0.5 day" },
+  { id:"zoominfo",   label:"ZoomInfo",                                   kind:"stock",  wave:1, effort:"0.5 day" },
+  { id:"qbo",        label:"QuickBooks Online",                          kind:"custom", cls:"OAuth SaaS REST", wave:2, effort:"3–7 days" },
+  { id:"stripe",     label:"Stripe",                                     kind:"custom", cls:"OAuth SaaS REST", wave:2, effort:"3–7 days" },
+  { id:"square",     label:"Square",                                     kind:"custom", cls:"OAuth SaaS REST", wave:2, effort:"3–7 days" },
+  { id:"hubspot",    label:"HubSpot",                                    kind:"custom", cls:"OAuth SaaS REST", wave:2, effort:"3–7 days" },
+  { id:"ghl",        label:"GoHighLevel (CRM · funnels · booking · payments)", kind:"custom", cls:"OAuth SaaS REST", wave:2, effort:"1–2 weeks" },
+  { id:"cfapi",      label:"Cloudflare API (client provisioning)", vert:"agency", kind:"stock", wave:1, effort:"0.5–1 day" },
+  { id:"salesforce", label:"Salesforce",                                 kind:"custom", cls:"OAuth SaaS REST", wave:2, effort:"5–10 days" },
+  { id:"netsuite",   label:"NetSuite (ERP)",             vert:"manufacturing", kind:"custom", cls:"Vertical SaaS", wave:3, effort:"2–4 weeks" },
+  { id:"epicor",     label:"Epicor / on-prem ERP",       vert:"manufacturing", kind:"custom", cls:"On-prem via Mesh/Tunnel", wave:3, effort:"3–6 weeks" },
+  { id:"cmms",       label:"CMMS / maintenance system",  vert:"manufacturing", kind:"custom", cls:"Vertical SaaS", wave:3, effort:"1–3 weeks" },
+  { id:"clio",       label:"Clio (practice mgmt)",       vert:"law",           kind:"custom", cls:"OAuth SaaS REST", wave:3, effort:"1–3 weeks" },
+  { id:"imanage",    label:"iManage / NetDocuments (DMS)", vert:"law",         kind:"custom", cls:"Vertical SaaS", wave:3, effort:"1–3 weeks" },
+  { id:"wealthbox",  label:"Wealthbox / Redtail (CRM)",  vert:"finserv",       kind:"custom", cls:"OAuth SaaS REST", wave:2, effort:"3–7 days" },
+  { id:"orion",      label:"Orion / Black Diamond (portfolio)", vert:"finserv", kind:"custom", cls:"Vertical SaaS", wave:3, effort:"1–3 weeks" },
+  { id:"emoney",     label:"eMoney / RightCapital (planning)",  vert:"finserv", kind:"custom", cls:"Vertical SaaS", wave:3, effort:"1–3 weeks" },
+  { id:"webpt",      label:"WebPT / Prompt / Jane (EMR)", vert:"pt",           kind:"custom", cls:"Vertical SaaS", wave:3, effort:"1–3 weeks" },
+  { id:"clearing",   label:"Eligibility / clearinghouse portal", vert:"pt",    kind:"custom", cls:"Vertical SaaS", wave:3, effort:"1–3 weeks" }
+];
+
+const VERTICALS = {
+  manufacturing: { label:"Manufacturing", guard:"OT/MES strictly read-only; PO issuance and quote sends behind approval; pricing data scoped to estimating roles.",
+    starters:[
+      { name:"RFQ triage → draft quote from cost history", dept:"Sales/Estimating", freq:10, minutes:45, people:2, feas:4, risk:"B", systems:["netsuite","google"] },
+      { name:"Daily production & downtime digest", dept:"Ops", freq:5, minutes:30, people:3, feas:4, risk:"A", systems:["epicor"] },
+      { name:"Supplier email triage → PO status answers", dept:"Purchasing", freq:25, minutes:10, people:2, feas:4, risk:"B", systems:["google","netsuite"] },
+      { name:"Maintenance ticket summarization + CAPA drafts", dept:"Quality", freq:8, minutes:25, people:2, feas:3, risk:"A", systems:["cmms"] } ] },
+  law: { label:"Law firm", guard:"Ethical walls via per-matter gatekeeper scoping; nothing filed or sent without attorney approval; no-training model endpoints only.",
+    starters:[
+      { name:"Intake triage + conflicts pre-check", dept:"Intake", freq:15, minutes:20, people:2, feas:4, risk:"B", systems:["clio","google"] },
+      { name:"Matter chronology builder", dept:"Attorneys", freq:6, minutes:60, people:4, feas:3, risk:"A", systems:["imanage"] },
+      { name:"Prebill narrative scrub", dept:"Billing", freq:4, minutes:90, people:1, feas:4, risk:"B", systems:["clio"] },
+      { name:"Deadline / docket digest", dept:"All", freq:5, minutes:15, people:6, feas:5, risk:"A", systems:["google","clio"] } ] },
+  finserv: { label:"Financial services (RIA)", guard:"No client-facing advice without advisor sign-off; PII reads block external sends; trading & money movement stay outside the OS.",
+    starters:[
+      { name:"Meeting-prep brief (CRM + holdings + notes)", dept:"Advisors", freq:12, minutes:40, people:3, feas:4, risk:"A", systems:["wealthbox","orion","google"] },
+      { name:"Post-meeting summary → CRM notes/tasks", dept:"Advisors", freq:12, minutes:25, people:3, feas:4, risk:"B", systems:["wealthbox"] },
+      { name:"Client review decks on live data", dept:"Advisors", freq:6, minutes:75, people:2, feas:3, risk:"A", systems:["orion"] },
+      { name:"Marketing-rule pre-review of outbound content", dept:"Compliance", freq:5, minutes:30, people:1, feas:4, risk:"B", systems:["google"] } ] },
+  salesmkt: { label:"Sales & marketing org", guard:"Outbound email behind approval until tone/deliverability proven; discount data scoped by role; brand-voice skill on all client-facing drafts.",
+    starters:[
+      { name:"Account research brief + call prep", dept:"Sales", freq:20, minutes:30, people:4, feas:5, risk:"A", systems:["hubspot","zoominfo","google"] },
+      { name:"Proposal generation from CRM context", dept:"Sales", freq:8, minutes:60, people:3, feas:4, risk:"B", systems:["hubspot","google"] },
+      { name:"Lead triage + enrichment → CRM hygiene", dept:"Sales/Mktg", freq:30, minutes:8, people:2, feas:4, risk:"B", systems:["hubspot","zoominfo"] },
+      { name:"Pipeline review digest", dept:"Leadership", freq:5, minutes:20, people:3, feas:5, risk:"A", systems:["hubspot"] } ] },
+  pt: { label:"Physical therapy clinic", guard:"HIPAA: BAAs before PHI flows; minimum-necessary gatekeeper scoping; PHI reads block sends to non-BAA destinations; therapist signs all clinical notes.",
+    starters:[
+      { name:"Referral intake → chart prep + benefits worksheet", dept:"Front desk", freq:20, minutes:25, people:2, feas:4, risk:"B", systems:["webpt","clearing","google"] },
+      { name:"Progress-note first drafts (therapist signs)", dept:"Clinical", freq:40, minutes:12, people:5, feas:3, risk:"B", systems:["webpt"] },
+      { name:"No-show / waitlist backfill workflow", dept:"Front desk", freq:15, minutes:10, people:2, feas:4, risk:"B", systems:["webpt","google"] },
+      { name:"Denial triage + appeal-letter drafts", dept:"Billing", freq:8, minutes:35, people:1, feas:4, risk:"B", systems:["webpt","clearing"] } ] },
+  agency: { label:"AI implementation agency (our firm)", guard:"Nothing reaches a prospect or client without approval; engagement data segregated per client workspace; provisioning into client accounts only via scoped tokens behind the approval queue.",
+    starters:[
+      { name:"Draft personalized replies to new GHL leads", dept:"Sales", freq:15, minutes:15, people:1, feas:4, risk:"B", systems:["ghl","google"] },
+      { name:"Synthesize discovery notes into scored use-case register", dept:"Delivery", freq:3, minutes:60, people:1, feas:4, risk:"A", systems:["google"] },
+      { name:"Generate client proposal deck from Studio design", dept:"Delivery", freq:2, minutes:90, people:1, feas:4, risk:"B", systems:["ghl","google"] },
+      { name:"Weekly engagement status digest to active clients", dept:"Delivery", freq:4, minutes:30, people:1, feas:5, risk:"B", systems:["ghl","google"] },
+      { name:"Chase client prerequisites (credentials, consents, IdP)", dept:"Delivery", freq:6, minutes:20, people:1, feas:4, risk:"B", systems:["ghl","google"] },
+      { name:"Scaffold starter repo from signed engagement record", dept:"Engineering", freq:1, minutes:120, people:1, feas:3, risk:"A", systems:["cfapi"] },
+      { name:"Invoice + payment reconciliation GHL ↔ QBO ↔ Stripe", dept:"Ops", freq:2, minutes:30, people:1, feas:4, risk:"B", systems:["qbo","stripe","ghl"] } ] },
+  other: { label:"Other / general", guard:"Start read-only; add writes behind approval queues after the pilot proves the read path.", starters:[] }
+};
+
+const RISK_LABEL = { A:"A · read-only", B:"B · write + approval", C:"C · external side effects" };
+
+/* =============================== state =============================== */
+const LS_KEY = "cfos-studio-v1";
+let db = load(); save();
+function blankClient(name){
+  return { name, vertical:"other", size:"", sponsor:"", itOwner:"", domain:"", accountId:"", audience:"",
+    adminEmails:"", idp:"access", domainOnCf:"yes", provider:"anthropic", dailyLimit:100,
+    systems:[], otherSystems:"", interviews:[], inbox:[], surveyNotes:"", artifacts:"",
+    useCases:[], approvers:{ payments:"", sends:"", records:"" }, steps:{} };
+}
+function hqClient(){
+  const starters = VERTICALS.agency.starters;
+  return Object.assign(blankClient("Our Firm — Cloudflare OS HQ"), {
+    vertical: "agency", size: 3,
+    sponsor: "Adam (Principal)", itOwner: "Adam (Principal)",
+    idp: "access", domainOnCf: "no", provider: "anthropic", dailyLimit: 200,
+    systems: ["ghl","google","qbo","stripe","cfapi"],
+    otherSystems: "E-signature via GoHighLevel Documents",
+    approvers: { payments: "Adam (Principal)", sends: "Adam (Principal)", records: "Adam (Principal)" },
+    interviews: [{ person: "Adam", role: "Principal", date: "", _open: false, answers: {
+      0: "Checked GHL for overnight leads and wrote three near-identical intro replies; updated the proposal template for a PT-clinic prospect; chased a client for their Stripe key; hand-assembled a weekly status update.",
+      1: "Lead intro/follow-up emails, proposal assembly from the same building blocks, weekly engagement status updates, and re-keying GHL contact data into documents.",
+      2: "How our discovery → design → build delivery method works end to end — it currently lives in one head and the playbook.",
+      3: "'Just checking in' prospect replies, and clients asking where their build stands — both deserve fast, good answers without me drafting each one.",
+      4: "The delivery method, effort estimates, and per-vertical patterns — the playbook and this Studio are the start of externalizing it.",
+      5: "Weekly engagement status per active client (from email, repo activity, and GHL) and a monthly P&L view from QuickBooks.",
+      7: "GHL ↔ proposal documents ↔ QuickBooks invoices — the same client data gets re-keyed three times.",
+      9: "Final proposal pricing, anything sent to a prospect or client, and any deploy into a client's Cloudflare account."
+    }}],
+    inbox: [
+      { text: "New lead asked for a PT-clinic case study — third time writing this reply from scratch", dept: "Sales", freq: 3 },
+      { text: "Re-keyed GHL contact + deal data into the proposal doc again", dept: "Delivery", freq: 2 },
+      { text: "Client hasn't sent their IdP admin contact — third chase email this week", dept: "Delivery", freq: 2 },
+      { text: "Assembled the weekly status update by hand from email threads + commit log", dept: "Delivery", freq: 4 }
+    ],
+    surveyNotes: "Small-team firm. Recurring themes: lead-reply drafting, proposal assembly, prerequisite chasing, and status reporting — all flowing through GoHighLevel + Google Workspace, invoiced via QBO/Stripe. Target architecture is the delivery-factory pipeline in playbook Section 12; this HQ deployment is its foundation.",
+    useCases: starters.map((s, i) => ({ ...s, systems: [...s.systems], pilot: i < 4 }))
+  });
+}
+function load(){
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(LS_KEY)); } catch(e){}
+  if (!d || !d.clients) d = { clients:{}, active:null, tab:"discovery" };
+  if (!d.hqSeeded) {
+    d.hqSeeded = true;
+    if (!d.clients.hq) { d.clients.hq = hqClient(); d.active = "hq"; }
+  }
+  if (!d.active || !d.clients[d.active]) d.active = Object.keys(d.clients)[0];
+  if (!d.active) { d.clients.hq = hqClient(); d.active = "hq"; }
+  return d;
+}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+function C(){ return db.clients[db.active]; }
+function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function slug(s){ return (s||"client").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,24) || "client"; }
+function toast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2200); }
+function copyText(txt){
+  if (navigator.clipboard && navigator.clipboard.writeText)
+    navigator.clipboard.writeText(txt).then(()=>toast("Copied"), ()=>legacyCopy(txt));
+  else legacyCopy(txt);
+}
+function legacyCopy(txt){
+  const ta = document.createElement("textarea"); ta.value = txt;
+  ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select();
+  let ok = false; try { ok = document.execCommand("copy"); } catch(e){}
+  ta.remove();
+  if (ok) toast("Copied"); else showCopyModal(txt);
+}
+function showCopyModal(txt){
+  const ov = document.createElement("div"); ov.className = "modal-overlay";
+  ov.innerHTML = `<div class="modal"><h3>Clipboard is blocked here — copy manually</h3>
+    <textarea rows="10" readonly style="width:100%"></textarea>
+    <p class="hint" style="margin:0.5rem 0">The text is selected — press Cmd+C (Mac) or Ctrl+C, then Close.</p>
+    <button class="primary" data-close>Close</button></div>`;
+  ov.querySelector("textarea").value = txt;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.querySelector("[data-close]").onclick = close;
+  ov.addEventListener("click", e => { if (e.target === ov) close(); });
+  const t = ov.querySelector("textarea"); t.focus(); t.select();
+}
+function clampNum(v, min, max, dflt){ const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : dflt; }
+
+/* =============================== header =============================== */
+function renderHeader(){
+  const sel = document.getElementById("clientSel");
+  sel.innerHTML = Object.entries(db.clients).map(([id,c])=>`<option value="${id}" ${id===db.active?"selected":""}>${esc(c.name)}</option>`).join("");
+}
+document.getElementById("clientSel").onchange = e => { db.active = e.target.value; save(); render(); };
+document.getElementById("btnNew").onclick = () => {
+  const name = prompt("Client name?"); if (!name) return;
+  const id = slug(name) + "-" + Date.now().toString(36).slice(-4);
+  db.clients[id] = blankClient(name); db.active = id; save(); render();
+};
+document.getElementById("btnDelete").onclick = () => {
+  if (Object.keys(db.clients).length <= 1) { toast("Can't delete the only client"); return; }
+  if (!confirm(`Delete "${C().name}" and all its data? This cannot be undone.`)) return;
+  delete db.clients[db.active]; db.active = Object.keys(db.clients)[0]; save(); render();
+};
+document.getElementById("btnExport").onclick = async () => {
+  const data = JSON.stringify({ client:C() }, null, 2);
+  const filename = `cfos-${slug(C().name)}.json`;
+  if (window.claude && window.claude.downloads && window.claude.downloads.save) {
+    try { await window.claude.downloads.save({ filename, data }); toast("Exported"); return; }
+    catch(err){
+      if (err && err.code === "declined") { toast("Export cancelled"); return; }
+      if (err && err.code === "rate_limited") { toast("A save prompt is already open"); return; }
+      /* other codes: fall through to plain download */
+    }
+  }
+  const blob = new Blob([data], { type:"application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = filename; a.click(); URL.revokeObjectURL(a.href); toast("Exported");
+};
+document.getElementById("btnImport").onclick = () => document.getElementById("importFile").click();
+document.getElementById("importFile").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(txt => {
+    try {
+      const d = JSON.parse(txt); const c = d.client || d;
+      if (!c.name) throw new Error("no name");
+      const id = slug(c.name) + "-" + Date.now().toString(36).slice(-4);
+      db.clients[id] = Object.assign(blankClient(c.name), c); db.active = id; save(); render(); toast("Imported");
+    } catch(err){ toast("Not a valid export file"); }
+  });
+  e.target.value = "";
+};
+
+/* =============================== tabs =============================== */
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { db.tab = b.dataset.tab; save(); render(); });
+
+function bind(elId, path, attr){
+  const el = document.getElementById(elId); if (!el) return;
+  el.addEventListener(attr || "input", () => {
+    const parts = path.split("."); let o = C();
+    for (let i=0;i<parts.length-1;i++) o = o[parts[i]];
+    o[parts[parts.length-1]] = (el.type === "number") ? Number(el.value) : el.value;
+    save();
+  });
+}
+
+/* =============================== discovery =============================== */
+function hostnameFor(c){ return c.domain ? ("os." + c.domain.trim()) : "os.CLIENT-DOMAIN.com"; }
+function stagingFor(c){ return c.domain ? ("os-staging." + c.domain.trim()) : "os-staging.CLIENT-DOMAIN.com"; }
+
+function renderDiscovery(){
+  const c = C();
+  const vertOpts = Object.entries(VERTICALS).map(([k,v])=>`<option value="${k}" ${c.vertical===k?"selected":""}>${v.label}</option>`).join("");
+  const sysBoxes = SYS.filter(s => !s.vert || s.vert === c.vertical).map(s =>
+    `<label><input type="checkbox" data-sys="${s.id}" ${c.systems.includes(s.id)?"checked":""}> ${esc(s.label)} <span class="pill ${s.kind}">${s.kind}</span></label>`).join("");
+
+  const interviews = c.interviews.map((iv,i)=>`
+    <details ${iv._open?"open":""}>
+      <summary>${esc(iv.person||"Unnamed")} — ${esc(iv.role||"role?")} <span class="tag">${esc(iv.date||"")}</span></summary>
+      <div class="inner">
+        <div class="grid2" style="margin-bottom:0.7rem">
+          <div class="field"><label>Person</label><input type="text" value="${esc(iv.person)}" data-iv="${i}" data-f="person"></div>
+          <div class="field"><label>Role / dept</label><input type="text" value="${esc(iv.role)}" data-iv="${i}" data-f="role"></div>
+          <div class="field"><label>Date</label><input type="date" value="${esc(iv.date)}" data-iv="${i}" data-f="date"></div>
+        </div>
+        ${IQ.map((q,qi)=>`<div class="qa"><div class="q">${qi+1}. ${esc(q)}</div><textarea rows="2" data-iv="${i}" data-q="${qi}">${esc(iv.answers[qi]||"")}</textarea></div>`).join("")}
+        <button class="danger" data-del-iv="${i}">Delete interview</button>
+      </div>
+    </details>`).join("");
+
+  const inbox = c.inbox.map((it,i)=>`
+    <tr>
+      <td style="white-space:normal; min-width:16rem">${esc(it.text)}</td>
+      <td>${esc(it.dept)}</td>
+      <td class="num">${esc(it.freq)}</td>
+      <td class="row-actions"><button data-del-inbox="${i}" class="danger">✕</button></td>
+    </tr>`).join("");
+
+  const ucRows = c.useCases.map((u,i)=>{
+    const hrsMo = Math.round(u.freq * u.minutes * u.people * 4.33 / 60);
+    return `<tr>
+      <td style="white-space:normal; min-width:14rem"><input type="text" value="${esc(u.name)}" data-uc="${i}" data-f="name" style="width:100%"></td>
+      <td><input type="text" value="${esc(u.dept)}" data-uc="${i}" data-f="dept"></td>
+      <td class="num"><input type="number" min="0" value="${u.freq}" data-uc="${i}" data-f="freq" title="times per week"></td>
+      <td class="num"><input type="number" min="0" value="${u.minutes}" data-uc="${i}" data-f="minutes" title="minutes each"></td>
+      <td class="num"><input type="number" min="1" value="${u.people}" data-uc="${i}" data-f="people" title="people affected"></td>
+      <td class="num"><input type="number" min="1" max="5" value="${u.feas}" data-uc="${i}" data-f="feas" title="feasibility 1–5"></td>
+      <td><select data-uc="${i}" data-f="risk">${["A","B","C"].map(r=>`<option value="${r}" ${u.risk===r?"selected":""}>${r}</option>`).join("")}</select></td>
+      <td class="num"><strong>${hrsMo}</strong></td>
+      <td style="text-align:center"><input type="checkbox" data-uc-pilot="${i}" ${u.pilot?"checked":""} title="include in pilot"></td>
+      <td class="row-actions"><button data-del-uc="${i}" class="danger">✕</button></td>
+    </tr>`;
+  }).join("");
+
+  return `
+  <h2>Phase 1 · Discovery</h2>
+  <p class="hint">Everything captured here feeds the generated Design &amp; Scope (tab 2) and the personalized Build Guide (tab 3). Work top to bottom; nothing is wasted.</p>
+
+  ${db.introDismissed ? "" : `<div class="card intro">
+    <h3>How this works <button class="ghost dismiss" id="btnDismissIntro" title="Hide this note">✕ dismiss</button></h3>
+    <ol>
+      <li><strong>Discovery (this tab):</strong> fill the client profile and systems, then capture interviews, magic-inbox items, and survey themes. Build the use-case register at the bottom — seed it from the vertical's known winners, add your own, or use AI assist to synthesize suggestions from your notes.</li>
+      <li><strong>Design &amp; Scope (tab 2):</strong> generates itself from this tab — pilot charter, integration map, policy matrix, timeline. Copy the scope doc straight into your proposal.</li>
+      <li><strong>Build Guide (tab 3):</strong> turns it all into numbered setup steps with copy-paste commands and config, personalized with the client's domain and choices.</li>
+    </ol>
+    <p style="margin:0"><strong>Start with the preloaded record: it's your own firm.</strong> "Our Firm — Cloudflare OS HQ" is seeded with our agency's real workflow patterns (GoHighLevel pipeline, proposal assembly, client provisioning) so the Build Guide walks you through standing up <em>our own</em> Cloudflare OS first — the delivery factory from playbook Section 12. Rename it, enter your real domain, and follow tab 3. Use <strong>+ New client</strong> for client engagements. <strong>Data lives only in this browser</strong> — it saves as you type; use <strong>Export</strong> (top right) for backup.</p>
+  </div>`}
+
+  <div class="card">
+    <h3>Client profile <span class="tag">drives the whole build — fill this first</span></h3>
+    <div class="grid2">
+      <div class="field"><label>Client name</label><input type="text" id="f-name" value="${esc(c.name)}"></div>
+      <div class="field"><label>Vertical</label><select id="f-vertical">${vertOpts}</select></div>
+      <div class="field"><label>Employee count</label><input type="number" id="f-size" value="${esc(c.size)}" min="1"></div>
+      <div class="field"><label>Executive sponsor</label><input type="text" id="f-sponsor" value="${esc(c.sponsor)}"></div>
+      <div class="field"><label>IT owner</label><input type="text" id="f-itOwner" value="${esc(c.itOwner)}"></div>
+      <div class="field"><label>Company domain (e.g. acme.com)</label><input type="text" id="f-domain" value="${esc(c.domain)}" placeholder="acme.com"></div>
+      <div class="field"><label>Domain already on Cloudflare?</label><select id="f-domainOnCf"><option value="yes" ${c.domainOnCf==="yes"?"selected":""}>Yes</option><option value="no" ${c.domainOnCf==="no"?"selected":""}>No / not sure</option></select></div>
+      <div class="field"><label>Sign-in method</label><select id="f-idp">
+        <option value="access" ${c.idp==="access"?"selected":""}>Cloudflare Access + their IdP (recommended)</option>
+        <option value="google" ${c.idp==="google"?"selected":""}>Google OAuth sign-in (small shops on Workspace)</option>
+        <option value="password" ${c.idp==="password"?"selected":""}>Password auth (avoid — dev only)</option></select></div>
+      <div class="field"><label>Model provider</label><select id="f-provider">
+        <option value="anthropic" ${c.provider==="anthropic"?"selected":""}>Anthropic (Claude)</option>
+        <option value="openai" ${c.provider==="openai"?"selected":""}>OpenAI</option>
+        <option value="mix" ${c.provider==="mix"?"selected":""}>Mixed via AI Gateway</option>
+        <option value="workersai" ${c.provider==="workersai"?"selected":""}>Workers AI only</option></select></div>
+      <div class="field"><label>Admin emails (comma-separated)</label><input type="text" id="f-adminEmails" value="${esc(c.adminEmails)}" placeholder="you@yourfirm.com, it@acme.com"></div>
+      <div class="field"><label>Daily LLM calls per user (free allowance)</label><input type="number" id="f-dailyLimit" value="${c.dailyLimit}" min="10"></div>
+    </div>
+    <div class="grid2" style="margin-top:0.7rem">
+      <div class="field"><label>Approver — payments / refunds</label><input type="text" id="f-ap-pay" value="${esc(c.approvers.payments)}"></div>
+      <div class="field"><label>Approver — outbound sends</label><input type="text" id="f-ap-send" value="${esc(c.approvers.sends)}"></div>
+      <div class="field"><label>Approver — records / filings</label><input type="text" id="f-ap-rec" value="${esc(c.approvers.records)}"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Systems inventory <span class="tag">check everything they run — this becomes the Gatekeeper map</span></h3>
+    <div class="checks">${sysBoxes}</div>
+    <div class="field" style="margin-top:0.7rem"><label>Other systems (free text)</label><input type="text" id="f-otherSystems" value="${esc(c.otherSystems)}" placeholder="e.g. Fishbowl inventory, legacy Access DB"></div>
+  </div>
+
+  <div class="card">
+    <h3>Interviews <span class="tag">the 10 questions, per stakeholder</span></h3>
+    ${interviews || '<p class="empty">No interviews yet.</p>'}
+    <button id="btnAddIv" class="primary">+ Add interview</button>
+  </div>
+
+  <div class="card">
+    <h3>Magic inbox log <span class="tag">paste forwarded routine-work items as they arrive</span></h3>
+    <div class="grid2" style="margin-bottom:0.6rem">
+      <div class="field"><label>Item (what work does it represent?)</label><input type="text" id="inboxText" placeholder="e.g. 'Customer asking for PO status — 5th this week'"></div>
+      <div class="field"><label>Dept</label><input type="text" id="inboxDept" placeholder="Purchasing"></div>
+      <div class="field"><label>Est. frequency /wk</label><input type="number" id="inboxFreq" value="1" min="1"></div>
+    </div>
+    <button id="btnAddInbox" class="primary">+ Log item</button>
+    <div class="tbl" style="margin-top:0.7rem">${c.inbox.length ? `<table><thead><tr><th>Item</th><th>Dept</th><th>Freq/wk</th><th></th></tr></thead><tbody>${inbox}</tbody></table>` : '<p class="empty">Nothing logged yet. Announce the alias in the survey below.</p>'}</div>
+  </div>
+
+  <div class="card">
+    <h3>Survey <span class="tag">send this to all staff; paste themes back below</span></h3>
+    <div class="codeblock"><pre id="surveyPre"></pre><button class="copy" id="btnCopySurvey">Copy</button></div>
+    <div class="field"><label>Aggregated survey themes / diagram &amp; artifact notes</label><textarea id="f-surveyNotes" rows="4" placeholder="Themes from responses; links to process diagrams, org charts, photos of whiteboards…">${esc(c.surveyNotes)}</textarea></div>
+  </div>
+
+  <div class="card">
+    <h3>Use-case register <span class="tag">value = freq × minutes × people → hours/month; pilot the top A/B-risk items</span></h3>
+    <p class="hint">Add rows from interviews and the inbox log — or seed from the vertical's known winners. Risk: A read-only · B write behind approval · C external side effects (don't pilot C).</p>
+    <button id="btnSeed">Seed starter use cases for ${VERTICALS[c.vertical].label}</button>
+    <button id="btnAddUc" class="primary">+ Add use case</button>
+    <div class="tbl" style="margin-top:0.7rem">${c.useCases.length ? `<table><thead><tr><th>Use case</th><th>Dept</th><th>Freq/wk</th><th>Min</th><th>People</th><th>Feas 1–5</th><th>Risk</th><th>Hrs/mo</th><th>Pilot</th><th></th></tr></thead><tbody>${ucRows}</tbody></table>` : '<p class="empty">No use cases yet.</p>'}</div>
+  </div>
+
+  <div class="card">
+    <h3>AI assist — synthesize discovery into use cases <span class="tag">optional · needs at least one interview or inbox item</span></h3>
+    <p class="hint">Sends the profile, interviews, inbox log, and survey themes to an AI model and gets back scored use-case suggestions in the register's exact format. Duplicates are skipped; everything stays editable.</p>
+
+    <div class="ai-opt">Option 1 · Copy-paste — works everywhere, including this hosted page</div>
+    <ol style="font-size:0.9rem; margin-top:0">
+      <li><strong>Copy the prompt</strong> (button below) — it embeds everything you've captured above.</li>
+      <li>Paste it into Claude (or any capable model) and run it.</li>
+      <li>Paste the JSON it returns into the box, then <strong>Add suggestions</strong>.</li>
+    </ol>
+    <button class="primary" id="btnCopyAiPrompt">Copy AI prompt</button>
+    <div class="field" style="margin-top:0.7rem"><label>Paste the model's JSON response here</label><textarea id="aiPaste" rows="4" placeholder='[{"name":"...","dept":"...","freq":5,"minutes":20,"people":2,"feas":4,"risk":"B","systems":["google"]}]'></textarea></div>
+    <button id="btnAiIngest">Add suggestions from paste</button>
+
+    <div class="ai-opt">Option 2 · Direct endpoint — only when you self-host this file</div>
+    <p class="hint" style="margin-bottom:0.5rem">Point this at your own AI proxy (Deploy notes below). On the claude.ai-hosted copy of this page, browser security blocks external calls — use Option 1 there.</p>
+    <div class="grid2">
+      <div class="field"><label>Endpoint URL (POST {prompt} → {text})</label><input type="text" id="aiEndpoint" value="${esc(db.aiEndpoint||"")}" placeholder="https://ai-proxy.yourfirm.com"></div>
+      <div class="field"><label>&nbsp;</label><button id="btnAiRun">Generate via endpoint</button></div>
+    </div>
+    <div class="warnbox" id="aiEndpointNote" style="display:none">The call was blocked or failed. If you're viewing this as a hosted claude.ai artifact, that's expected — external APIs are blocked by the page sandbox. Use Option 1 here, or self-host this file and try again. If self-hosted: check the endpoint URL, CORS headers, and that the Worker is deployed.</div>
+
+    <details style="margin-top:0.9rem"><summary>Deploy notes — self-hosting &amp; the AI proxy Worker</summary><div class="inner">
+      <p style="font-size:0.9rem">This app is one HTML file. To run it on your own domain (which unlocks Option 2): host it on Cloudflare Pages or a Worker at e.g. <code>studio.yourfirm.com</code>, and put Cloudflare Access in front so only your team can open it. Then deploy this proxy Worker so the browser never holds a provider key — the key lives in a Worker secret:</p>
+      <div class="codeblock"><pre id="workerSnippet"></pre><button class="copy" id="btnCopyWorker">Copy</button></div>
+      <p style="font-size:0.9rem">Deploy with <code>wrangler deploy</code>, set the secret with <code>wrangler secret put ANTHROPIC_API_KEY</code>, then paste the Worker's URL into the endpoint field above. Lock CORS to your studio hostname and put Access in front of the proxy too — never ship a provider key to the browser.</p>
+    </div></details>
+  </div>`;
+}
+
+function wireDiscovery(){
+  const c = C();
+  bind("f-name","name"); bind("f-size","size"); bind("f-sponsor","sponsor"); bind("f-itOwner","itOwner");
+  bind("f-domain","domain"); bind("f-adminEmails","adminEmails"); bind("f-dailyLimit","dailyLimit");
+  bind("f-otherSystems","otherSystems"); bind("f-surveyNotes","surveyNotes");
+  bind("f-ap-pay","approvers.payments"); bind("f-ap-send","approvers.sends"); bind("f-ap-rec","approvers.records");
+  document.getElementById("f-name").addEventListener("change", ()=>{ renderHeader(); });
+  ["f-vertical","f-idp","f-provider","f-domainOnCf"].forEach(id=>{
+    const el = document.getElementById(id);
+    el.onchange = () => { c[id.slice(2)] = el.value; save(); render(); };
+  });
+  document.querySelectorAll("[data-sys]").forEach(cb => cb.onchange = () => {
+    const id = cb.dataset.sys;
+    c.systems = cb.checked ? [...new Set([...c.systems, id])] : c.systems.filter(x=>x!==id);
+    save();
+  });
+  document.getElementById("btnAddIv").onclick = () => { c.interviews.push({ person:"", role:"", date:"", answers:{}, _open:true }); save(); render(); };
+  document.querySelectorAll("[data-iv][data-f]").forEach(el => el.addEventListener("input", ()=>{ c.interviews[el.dataset.iv][el.dataset.f] = el.value; save(); }));
+  document.querySelectorAll("[data-iv][data-q]").forEach(el => el.addEventListener("input", ()=>{ c.interviews[el.dataset.iv].answers[el.dataset.q] = el.value; save(); }));
+  document.querySelectorAll("[data-del-iv]").forEach(b => b.onclick = ()=>{ if(confirm("Delete this interview?")){ c.interviews.splice(b.dataset.delIv,1); save(); render(); } });
+  document.getElementById("btnAddInbox").onclick = () => {
+    const t = document.getElementById("inboxText").value.trim(); if (!t) return;
+    c.inbox.push({ text:t, dept:document.getElementById("inboxDept").value, freq:Number(document.getElementById("inboxFreq").value)||1 });
+    save(); render();
+  };
+  document.querySelectorAll("[data-del-inbox]").forEach(b => b.onclick = ()=>{ c.inbox.splice(b.dataset.delInbox,1); save(); render(); });
+  const sp = document.getElementById("surveyPre");
+  sp.textContent = `Subject: 10 quick questions — help us find your most annoying work\n\nWe're mapping which routine work an AI workspace should take off your plate. Reply inline — short answers are fine.\n\n${IQ.map((q,i)=>`${i+1}. ${q}`).join("\n")}\n\nAlso: forward any email that represents routine work to ${c.domain ? "routine@"+c.domain : "routine@<company-domain>"} for the next two weeks. Don't filter — volume is the signal.`;
+  document.getElementById("btnCopySurvey").onclick = () => copyText(sp.textContent);
+  document.getElementById("btnSeed").onclick = () => {
+    const st = VERTICALS[c.vertical].starters;
+    if (!st.length) { toast("No starters for this vertical"); return; }
+    st.forEach(s => c.useCases.push({ ...s, pilot:false }));
+    st.forEach(s => s.systems.forEach(id => { if (!c.systems.includes(id) && SYS.some(x=>x.id===id)) c.systems.push(id); }));
+    save(); render(); toast("Starters added — adjust the numbers to their reality");
+  };
+  document.getElementById("btnAddUc").onclick = () => { c.useCases.push({ name:"", dept:"", freq:1, minutes:15, people:1, feas:3, risk:"A", systems:[], pilot:false }); save(); render(); };
+  document.querySelectorAll("[data-uc][data-f]").forEach(el => el.addEventListener("change", ()=>{
+    const u = c.useCases[el.dataset.uc];
+    u[el.dataset.f] = (el.type==="number") ? Number(el.value) : el.value; save(); render();
+  }));
+  document.querySelectorAll("[data-uc-pilot]").forEach(el => el.onchange = ()=>{ c.useCases[el.dataset.ucPilot].pilot = el.checked; save(); });
+  document.querySelectorAll("[data-del-uc]").forEach(b => b.onclick = ()=>{ c.useCases.splice(b.dataset.delUc,1); save(); render(); });
+
+  const di = document.getElementById("btnDismissIntro");
+  if (di) di.onclick = () => { db.introDismissed = true; save(); render(); };
+  document.getElementById("btnCopyAiPrompt").onclick = () => {
+    if (!c.interviews.length && !c.inbox.length && !c.surveyNotes) { toast("Capture an interview or inbox item first"); return; }
+    copyText(aiPrompt());
+  };
+  document.getElementById("btnAiIngest").onclick = () => {
+    const raw = document.getElementById("aiPaste").value;
+    if (!raw.trim()) { toast("Paste the model's JSON first"); return; }
+    ingestAI(raw);
+  };
+  const ep = document.getElementById("aiEndpoint");
+  ep.addEventListener("change", () => { db.aiEndpoint = ep.value.trim(); save(); });
+  document.getElementById("btnAiRun").onclick = aiViaEndpoint;
+  document.getElementById("workerSnippet").textContent = WORKER_SNIPPET;
+  document.getElementById("btnCopyWorker").onclick = () => copyText(WORKER_SNIPPET);
+}
+
+/* =============================== AI assist =============================== */
+function aiPrompt(){
+  const c = C();
+  const allowed = SYS.filter(s => !s.vert || s.vert === c.vertical).map(s => `${s.id} = ${s.label}`).join("\n");
+  const ivs = c.interviews.map(iv =>
+    `### ${iv.person||"?"} — ${iv.role||"?"}\n` +
+    IQ.map((q,i) => iv.answers[i] ? `Q: ${q}\nA: ${iv.answers[i]}` : "").filter(Boolean).join("\n")
+  ).join("\n\n") || "(no interviews captured)";
+  const inbox = c.inbox.map(it => `- [${it.dept||"?"} · ~${it.freq}/wk] ${it.text}`).join("\n") || "(no inbox items)";
+  const existing = c.useCases.map(u => u.name).join("; ") || "(none)";
+  return `You are an AI-workspace deployment consultant. Below is raw discovery data from ${c.name}, a ${VERTICALS[c.vertical].label.toLowerCase()} with ~${c.size||"?"} employees. Synthesize it into candidate automation use cases for an agent workspace (Cloudflare OS) where agents read/write business systems through governed gatekeepers.
+
+## Systems in scope (use ONLY these ids in "systems")
+${allowed}
+
+## Interviews
+${ivs}
+
+## Routine-work inbox log
+${inbox}
+
+## Survey / other notes
+${c.surveyNotes || "(none)"}
+
+## Already-registered use cases (do NOT repeat these)
+${existing}
+
+## Your task
+Propose 5–12 NEW use cases. For each, estimate honestly from the data above:
+- freq: times per week it occurs
+- minutes: minutes per occurrence today
+- people: how many people do this work
+- feas: 1–5 API/data feasibility (5 = clean API + verifiable output)
+- risk: "A" read-only, "B" writes behind human approval, "C" external side effects (emails to customers, payments, filings)
+
+Respond with ONLY a JSON array, no prose, no markdown fences:
+[{"name":"...","dept":"...","freq":N,"minutes":N,"people":N,"feas":N,"risk":"A|B|C","systems":["id",...]}]`;
+}
+
+function ingestAI(raw){
+  const c = C();
+  let t = raw.trim().replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/, "");
+  const start = t.indexOf("["), end = t.lastIndexOf("]");
+  if (start < 0 || end <= start) { toast("No JSON array found in the paste"); return; }
+  let arr;
+  try { arr = JSON.parse(t.slice(start, end + 1)); }
+  catch(e){ toast("Couldn't parse that as JSON — paste the model's array exactly"); return; }
+  if (!Array.isArray(arr)) { toast("Expected a JSON array"); return; }
+  const okIds = new Set(SYS.map(s => s.id));
+  let added = 0, skipped = 0;
+  arr.slice(0, 15).forEach(r => {
+    if (!r || typeof r.name !== "string" || !r.name.trim()) { skipped++; return; }
+    if (c.useCases.some(u => u.name.trim().toLowerCase() === r.name.trim().toLowerCase())) { skipped++; return; }
+    c.useCases.push({
+      name: r.name.trim().slice(0, 120),
+      dept: String(r.dept || "").slice(0, 40),
+      freq: clampNum(r.freq, 0, 500, 1),
+      minutes: clampNum(r.minutes, 0, 600, 15),
+      people: clampNum(r.people, 1, 500, 1),
+      feas: clampNum(r.feas, 1, 5, 3),
+      risk: ["A","B","C"].includes(r.risk) ? r.risk : "B",
+      systems: Array.isArray(r.systems) ? r.systems.filter(id => okIds.has(id)) : [],
+      pilot: false
+    });
+    added++;
+  });
+  save(); render();
+  toast(added ? `${added} added${skipped ? `, ${skipped} skipped` : ""} — review the numbers` : "Nothing new to add");
+}
+
+async function aiViaEndpoint(){
+  const url = (db.aiEndpoint || "").trim();
+  if (!url) { toast("Set the endpoint URL first"); return; }
+  if (!/^https:\/\//.test(url)) { toast("Endpoint must be https://"); return; }
+  const btn = document.getElementById("btnAiRun");
+  btn.disabled = true; btn.textContent = "Generating…";
+  try {
+    const res = await fetch(url, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ prompt: aiPrompt() }) });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    let text;
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("json")) { const j = await res.json(); text = j.text || j.completion || j.content || JSON.stringify(j); }
+    else text = await res.text();
+    ingestAI(text);
+  } catch(e){
+    const note = document.getElementById("aiEndpointNote");
+    if (note) note.style.display = "block";
+    toast("Endpoint call failed — see the note");
+  } finally {
+    btn.disabled = false; btn.textContent = "Generate via endpoint";
+  }
+}
+
+const WORKER_SNIPPET = `// ai-proxy worker — deploy in the SAME Cloudflare account, key stays server-side
+// wrangler secret put ANTHROPIC_API_KEY
+const CORS = {
+  "access-control-allow-origin": "https://studio.yourfirm.com", // your studio hostname
+  "access-control-allow-methods": "POST, OPTIONS",
+  "access-control-allow-headers": "content-type"
+};
+export default {
+  async fetch(req, env) {
+    if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+    if (req.method !== "POST") return new Response("POST only", { status: 405, headers: CORS });
+    const { prompt } = await req.json();
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-5",
+        max_tokens: 3000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const j = await r.json();
+    const text = (j.content && j.content[0] && j.content[0].text) || "";
+    return new Response(JSON.stringify({ text }), {
+      headers: { "content-type": "application/json", ...CORS }
+    });
+  }
+};`;
+
+/* =============================== design =============================== */
+function designModel(){
+  const c = C();
+  const chosen = SYS.filter(s => c.systems.includes(s.id));
+  const stock = chosen.filter(s=>s.kind==="stock");
+  const custom = chosen.filter(s=>s.kind==="custom");
+  const ranked = [...c.useCases].map(u => ({ ...u, hrsMo: u.freq*u.minutes*u.people*4.33/60, score: u.freq*u.minutes*u.people*u.feas }))
+    .sort((a,b)=>b.score-a.score);
+  let pilots = ranked.filter(u=>u.pilot);
+  const suggested = ranked.filter(u=>u.risk!=="C").slice(0,5);
+  if (!pilots.length) pilots = suggested;
+  const totalHrs = Math.round(pilots.reduce((a,u)=>a+u.hrsMo,0));
+  const small = Number(c.size||0) > 0 && Number(c.size) <= 30;
+  const intWeeks = Math.max(2, Math.ceil(custom.length*1.5));
+  const weeks = (small?2:3) + 1 + intWeeks + 3 + (Number(c.size)>100?4:3) + 2;
+  return { c, chosen, stock, custom, ranked, pilots, suggested, totalHrs, weeks, small, intWeeks };
+}
+
+function scopeMarkdown(m){
+  const { c } = m;
+  return `# ${c.name} — Cloudflare OS Deployment: Proposed Scope
+_Prepared ${new Date().toLocaleDateString()} · ${VERTICALS[c.vertical].label} · ~${c.size||"?"} employees_
+
+## Objective
+Deploy Cloudflare OS as a governed AI agent workspace in ${c.name}'s own Cloudflare account: every employee gets an agent grounded in company knowledge, with all external actions mediated by credential-holding Gatekeepers, audit logging, and human approval queues.
+
+## Pilot workflows (${m.pilots.length})
+${m.pilots.map(u=>`- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo)} hrs/month recovered · risk tier ${u.risk}`).join("\n")}
+
+Estimated recoverable time across pilot: **~${m.totalHrs} hours/month**.
+
+## Integrations
+| System | Type | Wave | Build effort |
+|---|---|---|---|
+${m.chosen.map(s=>`| ${s.label} | ${s.kind==="stock"?"Stock gatekeeper":"Custom gatekeeper ("+s.cls+")"} | ${s.wave} | ${s.effort} |`).join("\n")}
+
+## Governance
+- Sign-in: ${c.idp==="access"?"Cloudflare Access + client IdP":c.idp==="google"?"Google OAuth (auth gatekeeper)":"Password (interim)"}
+- Models: ${c.provider} via AI Gateway; ${c.dailyLimit} calls/user/day allowance; per-team budgets
+- Approvals: payments → ${c.approvers.payments||"TBD"}; outbound sends → ${c.approvers.sends||"TBD"}; records/filings → ${c.approvers.records||"TBD"}
+- Vertical guardrails: ${VERTICALS[c.vertical].guard}
+
+## Timeline
+~${m.weeks} weeks: Discovery ${m.small?2:3}w → Foundation 1w → Integrations ${m.intWeeks}w (knowledge curation in parallel) → Pilot 3w → Rollout ${Number(c.size)>100?4:3}w → Handoff 2w.
+
+## Handoff
+Admin training, staging-tested upgrade runbook, governance council, signed acceptance checklist. Client owns account, data, credentials, and deployment config.`;
+}
+
+function renderDesign(){
+  const m = designModel(); const c = m.c;
+  if (!c.useCases.length && !c.systems.length) {
+    return `<h2>Phase 2 · Design &amp; Scope</h2><p class="hint">Nothing to generate yet — fill in the profile, systems, and use cases in Discovery first. This tab builds itself from that data.</p>`;
+  }
+  const pilotRows = m.pilots.map(u=>`<tr><td style="white-space:normal">${esc(u.name)}</td><td>${esc(u.dept)}</td><td class="num">${Math.round(u.hrsMo)}</td><td><span class="pill tier${u.risk}">${RISK_LABEL[u.risk]}</span></td><td style="white-space:normal">${u.systems.map(id=>{const s=SYS.find(x=>x.id===id);return s?esc(s.label.split(" (")[0]):id;}).join(", ")||"—"}</td></tr>`).join("");
+  const intRows = m.chosen.sort((a,b)=>a.wave-b.wave).map(s=>`<tr><td>${esc(s.label)}</td><td><span class="pill ${s.kind}">${s.kind==="stock"?"stock":"custom · "+s.cls}</span></td><td class="num">${s.wave}</td><td>${s.effort}</td></tr>`).join("");
+  const polRows = m.pilots.map(u=>{
+    const pol = u.risk==="A" ? "Read-only bindings; no approval needed" : u.risk==="B" ? "Write behind approval queue" : "External side effects — approval + simulate-first, do not pilot";
+    const appr = u.risk==="A" ? "—" : (u.name.toLowerCase().match(/refund|payment|invoice|bill/) ? (c.approvers.payments||"TBD") : u.name.toLowerCase().match(/note|chart|record|filing|crm/) ? (c.approvers.records||"TBD") : (c.approvers.sends||"TBD"));
+    return `<tr><td style="white-space:normal">${esc(u.name)}</td><td><span class="pill tier${u.risk}">${u.risk}</span></td><td style="white-space:normal">${pol}</td><td>${esc(appr)}</td></tr>`;
+  }).join("");
+  return `
+  <h2>Phase 2 · Design &amp; Scope</h2>
+  <p class="hint">Generated live from Discovery. Adjust the inputs there and this regenerates; when it looks right, copy the scope document and drop it into your proposal.</p>
+
+  <div class="card"><h3>Pilot charter <span class="tag">${c.useCases.some(u=>u.pilot) ? "your manual pilot selection" : "auto-suggested: top 5 by value × feasibility, C-risk excluded — tick Pilot boxes in Discovery to override"}</span></h3>
+    <div class="tbl"><table><thead><tr><th>Workflow</th><th>Dept</th><th>Hrs/mo</th><th>Risk</th><th>Systems</th></tr></thead><tbody>${pilotRows || '<tr><td colspan="5" class="empty">Add use cases in Discovery.</td></tr>'}</tbody></table></div>
+    <p style="margin:0.6rem 0 0"><strong>~${m.totalHrs} hours/month</strong> of recoverable time across the pilot set — this is your value anchor for pricing.</p>
+  </div>
+
+  <div class="card"><h3>Integration map <span class="tag">${m.stock.length} stock · ${m.custom.length} custom gatekeepers</span></h3>
+    <div class="tbl"><table><thead><tr><th>System</th><th>Gatekeeper</th><th>Wave</th><th>Effort</th></tr></thead><tbody>${intRows || '<tr><td colspan="4" class="empty">Check systems in Discovery.</td></tr>'}</tbody></table></div>
+  </div>
+
+  <div class="card"><h3>Policy matrix <span class="tag">what needs a human, and which human</span></h3>
+    <div class="tbl"><table><thead><tr><th>Workflow</th><th>Tier</th><th>Policy</th><th>Approver</th></tr></thead><tbody>${polRows}</tbody></table></div>
+    <div class="note" style="margin-top:0.6rem"><b>Vertical guardrails — ${VERTICALS[c.vertical].label}:</b> ${VERTICALS[c.vertical].guard}</div>
+  </div>
+
+  <div class="card"><h3>Model matrix &amp; budgets</h3>
+    <div class="tbl"><table><thead><tr><th>Task class</th><th>Route to</th><th>Control</th></tr></thead><tbody>
+      <tr><td>Digests, triage, summaries</td><td>${c.provider==="workersai"?"Workers AI small models":"Fast/cheap tier (e.g. Haiku-class)"}</td><td>Default for Workflows</td></tr>
+      <tr><td>Drafting, briefs, gadget building</td><td>${c.provider==="openai"?"OpenAI mid tier":"Sonnet-class mid tier"}</td><td>Default for Workspaces</td></tr>
+      <tr><td>High-value judgment work</td><td>Frontier tier, explicitly selected</td><td>Per-team budget cap in AI Gateway</td></tr>
+      <tr><td>All users</td><td>—</td><td>${c.dailyLimit} calls/user/day allowance; alerts at 80% of team budget</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="card"><h3>Timeline <span class="tag">~${m.weeks} weeks total</span></h3>
+    <div class="tbl"><table><thead><tr><th>Phase</th><th>Weeks</th></tr></thead><tbody>
+      <tr><td>Discovery</td><td class="num">${m.small?2:3}</td></tr>
+      <tr><td>Foundation deploy (prod + staging)</td><td class="num">1</td></tr>
+      <tr><td>Integrations (${m.custom.length} custom) — knowledge curation in parallel</td><td class="num">${m.intWeeks}</td></tr>
+      <tr><td>Pilot</td><td class="num">3</td></tr>
+      <tr><td>Rollout &amp; training</td><td class="num">${Number(c.size)>100?4:3}</td></tr>
+      <tr><td>Handoff</td><td class="num">2</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="card"><h3>Scope document <span class="tag">markdown, ready for your proposal</span></h3>
+    <button class="primary" id="btnCopyScope">Copy scope doc (Markdown)</button>
+  </div>`;
+}
+function wireDesign(){
+  const b = document.getElementById("btnCopyScope");
+  if (b) b.onclick = () => copyText(scopeMarkdown(designModel()));
+}
+
+/* =============================== build guide =============================== */
+function buildSteps(){
+  const c = C();
+  const host = hostnameFor(c), stag = stagingFor(c), sl = slug(c.name);
+  const admins = c.adminEmails || "you@yourfirm.com";
+  const steps = [];
+
+  steps.push({ id:"prereq", title:"Prepare your machine",
+    body:`<p>Everything installs on your Mac (or the client's designated deploy machine). One block, run in Terminal:</p>`,
+    code:`# Node 24 via nvm, pnpm 11, and Cloudflare's CLI
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+# close & reopen the terminal, then:
+nvm install 24
+npm install -g pnpm@11 wrangler
+wrangler login   # opens a browser — log in to the CLIENT's Cloudflare account`,
+    verify:`Run <code>node -v</code> (shows v24.x), <code>pnpm -v</code> (shows 11.x), and <code>wrangler whoami</code> (shows the client's account, not yours).` });
+
+  steps.push({ id:"account", title:"Cloudflare account & Workers Paid plan",
+    body:`<ol>
+      <li>Have ${esc(c.itOwner||"the IT owner")} create the account at <code>dash.cloudflare.com/sign-up</code> using a company email (never a personal one). If an account exists, get yourself invited as an admin (scoped; you'll revoke this at handoff).</li>
+      <li>In the dashboard: <strong>Workers &amp; Pages → Plans → upgrade to Workers Paid</strong> ($5/mo base).</li>
+      <li>Copy the <strong>Account ID</strong> (right-hand sidebar of any zone page, or Workers &amp; Pages overview) and paste it here — it flows into the config below:</li>
+    </ol>
+    <span class="inline-input"><input type="text" data-bind="accountId" value="${esc(c.accountId)}" placeholder="32-char account ID" size="36"></span>`,
+    verify:`Account ID field above is filled; Workers &amp; Pages shows "Paid plan".` });
+
+  steps.push({ id:"zone", title:`Get ${esc(host)} ready`,
+    body: c.domainOnCf==="yes"
+      ? `<p><strong>${esc(c.domain||"the company domain")}</strong> is already on Cloudflare — nothing to migrate. The deploy will attach the Workers to <code>${esc(host)}</code> and <code>${esc(stag)}</code>; you only need the zone active in this account.</p>`
+      : `<ol>
+          <li>In the dashboard: <strong>Add a domain</strong> → enter <code>${esc(c.domain||"the company domain")}</code> → free plan is fine for DNS.</li>
+          <li>Cloudflare shows two nameservers. The client's IT owner updates nameservers at their registrar (GoDaddy/Namecheap/etc. → Domain settings → Nameservers → Custom).</li>
+          <li>Wait for the zone to show <strong>Active</strong> (minutes to a few hours).</li>
+          <li><em>Alternative if IT won't move the apex domain:</em> delegate just a subdomain (<code>os.${esc(c.domain||"acme.com")}</code>) as its own zone via NS records — coordinate with IT.</li>
+        </ol>`,
+    verify:`The zone shows <strong>Active</strong> in the dashboard.` });
+
+  if (c.idp === "access") {
+    steps.push({ id:"access", title:"Cloudflare Access application (SSO)",
+      body:`<ol>
+        <li>Dashboard → <strong>Zero Trust</strong> (one.dash.cloudflare.com) → pick a team name if prompted (e.g. <code>${esc(sl)}</code>).</li>
+        <li><strong>Settings → Authentication → Login methods → Add</strong> — connect the client's IdP (Entra ID / Google Workspace / Okta). The client's IdP admin approves the app on their side.</li>
+        <li><strong>Access → Applications → Add an application → Self-hosted</strong>. Application domain: <code>${esc(host)}</code>. Add a policy: Allow → Emails ending in <code>@${esc(c.domain||"acme.com")}</code> (tighten later).</li>
+        <li>Open the application's settings and copy the <strong>Application Audience (AUD) tag</strong>. Paste it here:</li>
+      </ol>
+      <span class="inline-input"><input type="text" data-bind="audience" value="${esc(c.audience)}" placeholder="AUD tag (long hex string)" size="44"></span>
+      <p style="margin-top:0.5rem">Repeat the application setup for <code>${esc(stag)}</code> (same IdP, a second self-hosted app).</p>`,
+      verify:`Visiting <code>https://${esc(host)}</code> (even before deploy) bounces you to the IdP login instead of a DNS error page.` });
+  } else if (c.idp === "google") {
+    steps.push({ id:"gauth", title:"Google OAuth sign-in (auth gatekeeper)",
+      body:`<ol>
+        <li>Go to <code>console.cloud.google.com</code> → create a project named <code>${esc(sl)}-os</code>.</li>
+        <li><strong>APIs &amp; Services → OAuth consent screen</strong>: Internal (requires Google Workspace), app name "${esc(c.name)} Workspace", support email = IT owner.</li>
+        <li><strong>Credentials → Create credentials → OAuth client ID → Web application</strong>. Authorized redirect URI — exactly:</li>
+      </ol>`,
+      code:`https://${host}/gatekeeper/google/oauth`,
+      body2:`<p>Save the client ID and secret — they go into the deployment's gatekeeper credentials in the config step. In the deployment env you will set <code>AUTH_GATEKEEPERS=google</code> and, once sign-in works, <code>DISABLE_PASSWORD_AUTH=true</code>. Sign-in requests only minimal scopes (<code>openid email profile</code>) and identity is keyed to the verified email.</p>`,
+      verify:`OAuth client created; redirect URI matches the block above character-for-character.` });
+  } else {
+    steps.push({ id:"pwwarn", title:"Password sign-in (interim only)",
+      body:`<div class="warnbox">You selected password auth. Acceptable for a first look, wrong for production — no MFA, no central offboarding. Plan to switch to Access or Google OAuth before pilot. Nothing to configure now; the deploy ships with password auth on by default.</div>`,
+      verify:`You've told the sponsor this is temporary, in writing.` });
+  }
+
+  steps.push({ id:"clone", title:"Clone the starter and install",
+    body:`<p>The starter wraps a <strong>pinned Cloudflare OS release</strong> with the client's config — you never patch upstream code.</p>`,
+    code:`git clone https://github.com/cloudflare/cloudflare-os-starter.git ${sl}-os
+cd ${sl}-os
+pnpm install`,
+    verify:`<code>pnpm install</code> completes without errors and the repo contains <code>deployment.jsonc</code>.` });
+
+  steps.push({ id:"config", title:"Fill deployment.jsonc",
+    body:`<p>Open <code>deployment.jsonc</code> in the cloned repo. It ships as a commented template — set these values (match by meaning; exact key names come from the template in your pinned release):</p>`,
+    code:`{
+  // ---- ${c.name} · generated by Cloudflare OS Studio ----
+  "accountId": "${c.accountId || "<PASTE ACCOUNT ID — step 2>"}",
+  "hostname": "${host}",
+  // staging deployment (second copy of this file or env-specific block):
+  //   "hostname": "${stag}",
+  "workerName": "${sl}-os",
+  ${c.idp==="access" ? `"accessAudience": "${c.audience || "<PASTE AUD TAG — Access step>"}",` : `// no Access audience — sign-in via ${c.idp==="google"?"AUTH_GATEKEEPERS=google":"password auth"}`}
+  "adminEmails": [${admins.split(",").map(e=>`"${e.trim()}"`).join(", ")}]
+  // KV namespaces + R2 bucket auto-provision on first deploy;
+  // pin them here afterwards if the template asks for explicit IDs.
+}`,
+    verify:`<code>pnpm check</code> passes (it validates this file before any deploy).` });
+
+  steps.push({ id:"deploy", title:"Deploy production and staging",
+    body:`<p>Two deployments from day one — staging is where every future upgrade gets tested first.</p>`,
+    code:`pnpm check     # validate config
+pnpm deploy    # builds and pushes to the client's account
+
+# then repeat with the staging hostname configured:
+#   ${stag}`,
+    verify:`Open <code>https://${esc(host)}</code> → you hit ${c.idp==="access"?"the IdP login, then":""} the workspace. Create a test doc; it saves. The <code>/admin</code> panel loads for an admin email.` });
+
+  steps.push({ id:"gateway", title:"AI Gateway — models, budgets, allowance",
+    body:`<ol>
+      <li>Dashboard → <strong>AI → AI Gateway → Create gateway</strong> named <code>${esc(sl)}-gw</code>.</li>
+      <li>Create an API token: <strong>My Profile → API Tokens → Create</strong> with <strong>AI Gateway Run + Read</strong> permissions on this account.</li>
+      <li>${c.provider==="workersai" ? "Using Workers AI only — no external provider keys needed." : `Add the client's ${c.provider==="mix"?"provider keys (Anthropic + OpenAI)":c.provider==="openai"?"OpenAI key":"Anthropic key"} — keys created in the <em>client's</em> provider account, on enterprise/no-training terms, stored in the gateway or as Worker secrets. Never your own keys.`}</li>
+      <li>Set the platform env (via the starter's secrets flow / <code>wrangler secret put</code> for the sensitive ones):</li>
+    </ol>`,
+    code:`ENABLE_CLOUDFLARE_LIMITS=true
+CF_AI_GATEWAY=${sl}-gw
+CF_AI_GATEWAY_ACCOUNT_ID=${c.accountId || "<ACCOUNT ID>"}
+CF_AI_GATEWAY_API_TOKEN=<secret — use wrangler secret put>
+DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
+    verify:`Ask the workspace agent anything; the request appears in the AI Gateway logs with attribution. Set a team budget alert at 80%.` });
+
+  steps.push({ id:"brand", title:"Branding & announcements",
+    body:`<ol>
+      <li>Open <code>https://${esc(host)}/admin</code> as an admin email.</li>
+      <li>Set site name ("${esc(c.name)} Workspace"), logo, accent color, and a welcome announcement pointing at the pilot workflows.</li>
+      <li>No redeploy needed — this is runtime config.</li>
+    </ol>`,
+    verify:`A non-admin pilot user sees the client's name and logo on sign-in.` });
+
+  const sysSteps = {
+    google: { t:"Connect Google Workspace (stock gatekeeper)", b:`<ol>
+      <li>In <code>console.cloud.google.com</code> (same project as sign-in if you made one): enable the Gmail, Calendar, and Drive APIs.</li>
+      <li>Create an OAuth client (Web application) with redirect URI <code>https://${host}/gatekeeper/google/oauth</code>.</li>
+      <li>Put the client ID/secret into the Google gatekeeper's credential config (per that gatekeeper's doc page in the repo — credentials live on the gatekeeper Worker, never in agent-visible code).</li>
+      <li>A pilot user clicks Connect on the Google gatekeeper and grants the fuller scopes; policy starts <strong>read-only</strong>: no send scope until pilot week 2.</li></ol>`,
+      v:`A pilot user's agent can summarize their inbox but a send attempt lands in the approval queue (or is refused), not in Sent.` },
+    slack: { t:"Connect Slack (stock gatekeeper)", b:`<ol><li>api.slack.com/apps → Create app → from scratch, in the client's workspace.</li><li>Add the scopes the gatekeeper's doc page lists (start read-only: channels:history, channels:read).</li><li>Install to workspace; put the tokens in the gatekeeper credential config.</li><li>Route approval-queue notifications to a private #os-approvals channel.</li></ol>`, v:`Agent can summarize a channel; posting requires approval.` },
+    notion: { t:"Connect Notion (stock gatekeeper)", b:`<ol><li>notion.so/my-integrations → New integration in the client's workspace, read-only capabilities first.</li><li>Share only the SOP/wiki pages that belong in agent context with the integration.</li><li>Token into the gatekeeper credential config.</li></ol>`, v:`Agent answers a question citing a wiki page it could only know from Notion.` },
+    confluence: { t:"Connect Confluence (stock gatekeeper)", b:`<ol><li>Create an API token in the client's Atlassian admin.</li><li>Scope the gatekeeper to the specific spaces that belong in agent context.</li><li>Token into the gatekeeper credential config.</li></ol>`, v:`Agent cites a Confluence page correctly.` },
+    zoominfo: { t:"Connect ZoomInfo (stock gatekeeper)", b:`<ol><li>Get API credentials from the client's ZoomInfo admin portal.</li><li>Configure per the gatekeeper's doc page; set a per-day lookup cap in policy.</li></ol>`, v:`Agent enriches a test company; the lookup appears in the observation log.` },
+    m365: { t:"Build the Microsoft 365 gatekeeper (custom · Graph)", b:`<ol>
+      <li>entra.microsoft.com → App registrations → New. Single tenant. Redirect URI: <code>https://${host}/gatekeeper/m365/oauth</code>.</li>
+      <li>API permissions (delegated, admin consent): start with <code>Mail.Read</code>, <code>Calendars.Read</code>. Add write scopes only after pilot proves reads.</li>
+      <li>Client secret → gatekeeper credential config.</li>
+      <li>Scaffold the gatekeeper in <code>packages/custom-gatekeeper</code> — align the class shape with the gatekeeper interface in your pinned release (crib from a stock gatekeeper in the upstream <code>packages/</code>):</li></ol>`,
+      code:`// packages/custom-gatekeeper/src/m365.ts — SCAFFOLD: align with your
+// pinned release's gatekeeper interface before shipping.
+export class M365Gatekeeper {
+  // Credentials live here, injected as Worker secrets — never visible to agents.
+  // Expose narrow, typed capabilities only:
+  async summarizeInbox(userId: string, since: string) { /* Graph: GET /me/messages */ }
+  async listEvents(userId: string, range: string)     { /* Graph: GET /me/calendarView */ }
+  // Side effects go through the approval queue — never send directly:
+  async draftReply(messageId: string, body: string)   { /* create draft only */ }
+}`, v:`Agent summarizes a mailbox; drafts appear in Outlook Drafts, nothing sends.` },
+    qbo: { t:"Build the QuickBooks Online gatekeeper (custom)", b:`<ol>
+      <li>developer.intuit.com → sign in with the client's Intuit developer account (create one owned by them) → Create an app → QuickBooks Online and Payments → scope <code>com.intuit.quickbooks.accounting</code>.</li>
+      <li>Redirect URI: <code>https://${host}/gatekeeper/qbo/oauth</code>. Note client ID/secret.</li>
+      <li>Connect the <strong>sandbox company first</strong>; production consent only after the pilot works in sandbox.</li>
+      <li>Scaffold:</li></ol>`,
+      code:`// packages/custom-gatekeeper/src/qbo.ts — SCAFFOLD
+export class QboGatekeeper {
+  async arAging(realmId: string)              { /* read: AgedReceivables report */ }
+  async recentTransactions(realmId: string)   { /* read-only queries */ }
+  async draftInvoice(realmId: string, data: InvoiceDraft) {
+    /* create as DRAFT + enqueue for approval by: ${c.approvers.payments || "APPROVER"} */
+  }
+}`, v:`AR aging digest renders in a workspace doc from sandbox data; invoice creation waits in the approval queue.` },
+    stripe: { t:"Build the Stripe gatekeeper (custom)", b:`<ol>
+      <li>Client's Stripe dashboard → Developers → API keys → <strong>Create restricted key</strong>: read on Charges/Payouts/Disputes; write on Refunds ONLY.</li>
+      <li>Never accept the full secret key — if the client offers it, decline and create the restricted key together.</li>
+      <li>Scaffold:</li></ol>`,
+      code:`// packages/custom-gatekeeper/src/stripe.ts — SCAFFOLD
+export class StripeGatekeeper {
+  async dailyRevenue()                 { /* read: charges + payouts */ }
+  async disputeEvidence(disputeId: string) { /* read + assemble evidence doc */ }
+  async refund(chargeId: string, amountCents: number) {
+    /* HARD GATE: enqueue for ${c.approvers.payments || "APPROVER"}; execute only on approval */
+  }
+}`, v:`Revenue digest matches the Stripe dashboard for the same day; a test refund sits in the queue until approved.` },
+    square: { t:"Build the Square gatekeeper (custom)", b:`<ol><li>developer.squareup.com → client-owned app → OAuth with read scopes on Payments/Orders; refunds write only.</li><li>Same pattern as Stripe: reads free, refunds behind ${esc(c.approvers.payments||"the payments approver")}.</li></ol>`, v:`Settlement digest matches Square dashboard; refunds queue.` },
+    ghl: { t:"Build the GoHighLevel gatekeeper (custom)", b:`<ol>
+      <li>In GHL: <strong>Settings → Private Integrations → Create</strong> (or a Marketplace app if you need OAuth across locations). Scopes: contacts read, opportunities read, calendars read, conversations read. <strong>No send scope yet</strong> — drafts queue for approval first.</li>
+      <li>Configure GHL <strong>webhooks</strong> for the pipeline triggers: payment received and document signed → point them at a dedicated Worker route that starts your OS kickoff/build Workflows.</li>
+      <li>Leave campaigns and bulk sends in GHL — the gatekeeper is for agent reads, approved one-off drafts, and inbound events, not for rebuilding marketing automation.</li>
+      <li>Scaffold:</li></ol>`,
+      code:`// packages/custom-gatekeeper/src/ghl.ts — SCAFFOLD, align with your
+// pinned release's gatekeeper interface before shipping.
+export class GhlGatekeeper {
+  async newLeads(since: string)        { /* GET /contacts, filter by created date */ }
+  async engagementPipeline()           { /* opportunities by pipeline stage */ }
+  async draftReply(contactId: string, body: string) {
+    /* create draft only — enqueue for approval by: ${c.approvers.sends || "APPROVER"} */
+  }
+  // Inbound: a webhook route receives payment + document-signed events
+  // and triggers the kickoff / build Workflows.
+}`, v:`A test lead created in GHL shows up in a workspace digest; a drafted reply waits in the approval queue instead of sending; a test payment webhook fires the kickoff Workflow.` },
+    cfapi: { t:"Configure the Cloudflare API gatekeeper (client provisioning)", b:`<ol>
+      <li>This is the factory's provisioning arm — it lets agents create resources in <em>client</em> accounts, governed. A stock Cloudflare API gatekeeper ships with the platform.</li>
+      <li>Per engagement, the <strong>client</strong> creates a scoped API token in their account (Workers Scripts:Edit, KV:Edit, R2:Edit, AI Gateway:Edit — never a Global API Key) and hands it over via the Section 05 checklist.</li>
+      <li>Store each token in the gatekeeper keyed to that engagement; policy: <strong>every provisioning action lands in your approval queue</strong> showing the exact API call before it runs.</li>
+      <li>Rotate/revoke the token at handoff — it's already on the acceptance checklist.</li></ol>`,
+      v:`A dry-run provisioning action against a sandbox account appears in the approval queue with the exact call listed, and executes only after approval.` },
+    hubspot: { t:"Build the HubSpot gatekeeper (custom)", b:`<ol>
+      <li>Client's HubSpot → Settings → Integrations → <strong>Private Apps</strong> → Create. Scopes: crm.objects.contacts.read, crm.objects.deals.read (writes later).</li>
+      <li>Token → gatekeeper credential config.</li>
+      <li>Scaffold:</li></ol>`,
+      code:`// packages/custom-gatekeeper/src/hubspot.ts — SCAFFOLD
+export class HubspotGatekeeper {
+  async accountBrief(companyId: string)  { /* contacts + deals + notes for call prep */ }
+  async pipelineDigest(ownerId: string)  { /* open deals by stage, stale flags */ }
+  async logActivity(dealId: string, note: string) { /* write behind approval or auto per policy */ }
+}`, v:`Call-prep brief for a real account is accurate; CRM writes appear only after approval.` },
+    salesforce: { t:"Build the Salesforce gatekeeper (custom)", b:`<ol><li>Setup → App Manager → New Connected App; OAuth scopes api, refresh_token; callback <code>https://${host}/gatekeeper/sfdc/oauth</code>.</li><li>Use a dedicated integration user with a read-mostly profile — never an admin user.</li></ol>`, v:`Brief generation works; writes require approval.` },
+    wealthbox: { t:"Build the Wealthbox/Redtail gatekeeper (custom)", b:`<ol><li>API token from the client's CRM admin settings.</li><li>Read: contacts, notes, tasks. Write (notes/tasks) behind advisor approval per the policy matrix.</li></ol>`, v:`Meeting-prep brief pulls real CRM history; note-writes queue for the advisor.` },
+    orion: { t:"Connect the portfolio platform (custom)", b:`<ol><li>Request API credentials through the client's Orion/Black Diamond rep (this takes days — start early).</li><li>Read-only holdings/performance. No trading endpoints, ever.</li></ol>`, v:`Review-deck numbers match the portfolio platform's own report.` },
+    emoney: { t:"Connect planning software (custom)", b:`<ol><li>API access via the vendor; read-only plan summaries.</li></ol>`, v:`Plan facts in briefs match the planning tool.` },
+    netsuite: { t:"Build the NetSuite gatekeeper (custom)", b:`<ol><li>Setup → Integration → Manage Integrations → New; token-based auth; a role limited to the records in scope (quotes, POs, items).</li><li>Read-only first; PO/quote writes behind ${esc(c.approvers.payments||"the approver")}.</li></ol>`, v:`Quote-history lookups match NetSuite saved searches.` },
+    epicor: { t:"Reach the on-prem ERP (custom via Tunnel)", b:`<ol><li>Install <code>cloudflared</code> on a server that can reach the ERP's API/DB (IT does this with you).</li><li>Create a Tunnel; expose only the specific API endpoints needed, protected by Access service auth.</li><li>Gatekeeper calls through the tunnel; <strong>read-only, always</strong>, for anything near OT/MES.</li></ol>`, v:`Downtime digest matches the ERP report; the tunnel dashboard shows only expected traffic.` },
+    cmms: { t:"Connect the CMMS (custom)", b:`<ol><li>API token from the CMMS admin; read tickets/assets, write (new ticket drafts) behind approval.</li></ol>`, v:`Maintenance summaries cite real tickets.` },
+    clio: { t:"Build the Clio gatekeeper (custom)", b:`<ol><li>app.clio.com → Settings → Developer Applications → New; redirect <code>https://${host}/gatekeeper/clio/oauth</code>.</li><li>Read matters/contacts/calendars; time-entry and document writes behind attorney approval.</li></ol>`, v:`Docket digest matches Clio's calendar; nothing writes without approval.` },
+    imanage: { t:"Connect the DMS (custom)", b:`<ol><li>API access via the client's DMS admin (iManage Control Center / NetDocuments admin).</li><li><strong>Scope per matter</strong> — the gatekeeper enforces ethical walls; verify a walled user cannot pull a walled matter.</li></ol>`, v:`Red-team check: an agent for a walled user gets a refusal, logged in observations.` },
+    webpt: { t:"Connect the EMR (custom · PHI)", b:`<div class="warnbox">STOP unless BAAs are signed — Cloudflare (enterprise) and the model provider. No PHI flows before paperwork.</div><ol><li>API credentials via the EMR's integration program (WebPT/Prompt/Jane each have one; lead time days–weeks).</li><li>Minimum-necessary scoping per role; therapists see their patients only.</li><li>Data-flow policy: PHI reads block external sends.</li></ol>`, v:`Chart-prep worksheet renders for a test patient; an attempted external send after a PHI read is blocked and logged.` },
+    clearing: { t:"Connect eligibility/clearinghouse (custom · PHI)", b:`<ol><li>API credentials from the clearinghouse account.</li><li>Per-check logging; benefits worksheets only — no claim submission in phase one.</li></ol>`, v:`Benefits check for a test patient matches the portal's answer.` }
+  };
+
+  SYS.filter(s => c.systems.includes(s.id)).sort((a,b)=>a.wave-b.wave).forEach(s => {
+    const d = sysSteps[s.id]; if (!d) return;
+    steps.push({ id:"sys-"+s.id, title:d.t, body:d.b, code:d.code, body2:d.body2, verify:d.v });
+  });
+
+  steps.push({ id:"knowledge", title:"Load knowledge & skills",
+    body:`<ol>
+      <li>Collect the SOP corpus (Section 05 checklist of the playbook) into an R2-backed knowledge source; connect the wiki via its gatekeeper.</li>
+      <li>Write the first 10–15 skills files (<code>.agents/skills/</code>) — one per pilot workflow, in the client's vocabulary. Start each from your vertical kit and edit with the champion beside you.</li>
+      <li>Load the ${VERTICALS[c.vertical].label} guardrails into a standing policy skill: <em>${esc(VERTICALS[c.vertical].guard)}</em></li>
+    </ol>`,
+    verify:`A champion runs a pilot workflow cold; the agent uses the right terms, process, and sources — confirmed in the observation log.` });
+
+  steps.push({ id:"pilotready", title:"Pilot readiness — final gate",
+    body:`<ul>
+      <li>All pilot users signed in via ${c.idp==="access"?"Access/IdP":c.idp==="google"?"Google OAuth":"password (interim!)"}; roster loaded.</li>
+      <li>Approval queues route: payments → <strong>${esc(c.approvers.payments||"⚠ unset")}</strong>, sends → <strong>${esc(c.approvers.sends||"⚠ unset")}</strong>, records → <strong>${esc(c.approvers.records||"⚠ unset")}</strong>.</li>
+      <li>Red-team pass: an agent asked to exceed scope gets refused, and the refusal is in the observation log.</li>
+      <li>Metrics baseline recorded: hours/workflow (from tab 2: your anchor is the pilot's hrs/month), spend/user, approval latency.</li>
+      <li>Champions briefed; weekly tuning session on the calendar.</li>
+    </ul>`,
+    verify:`Sponsor signs the pilot charter; day-one pilot session scheduled.` });
+
+  return steps;
+}
+
+function renderBuild(){
+  const c = C();
+  const steps = buildSteps();
+  const done = steps.filter(s=>c.steps[s.id]).length;
+  const pct = Math.round(100*done/steps.length);
+  const header = `
+  <h2>Phase 3 · Build Guide</h2>
+  <p class="hint">Generated for <strong>${esc(c.name)}</strong> from the Discovery answers — hostnames, config, and per-system steps below are personalized. Follow top to bottom; each step says how to verify it worked. Change Discovery, and this guide regenerates.</p>
+  <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+  <p class="hint">${done} of ${steps.length} steps complete</p>
+  ${(!c.domain || !c.accountId) ? `<div class="warnbox">Missing inputs: ${!c.domain?"<strong>company domain</strong> (Discovery → profile) ":""}${!c.accountId?"<strong>Account ID</strong> (step 2 below)":""} — placeholders appear in the config until filled.</div>` : ""}`;
+  const body = steps.map((s,i)=>`
+    <div class="step ${c.steps[s.id]?"done":""}">
+      <div><div class="step-num">${i+1}</div></div>
+      <div class="step-body">
+        <h3>${esc(s.title)} <label><input type="checkbox" data-step="${s.id}" ${c.steps[s.id]?"checked":""}> done</label></h3>
+        ${s.body||""}
+        ${s.code!==undefined?`<div class="codeblock"><pre data-code="${i}"></pre><button class="copy" data-copy="${i}">Copy</button></div>`:""}
+        ${s.body2||""}
+        ${s.verify?`<div class="verify"><b>You know it worked when</b>${s.verify}</div>`:""}
+      </div>
+    </div>`).join("");
+  return header + body;
+}
+function wireBuild(){
+  const c = C();
+  const steps = buildSteps();
+  document.querySelectorAll("[data-code]").forEach(pre => { pre.textContent = steps[pre.dataset.code].code || ""; });
+  document.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(steps[b.dataset.copy].code || ""));
+  document.querySelectorAll("[data-step]").forEach(cb => cb.onchange = () => { c.steps[cb.dataset.step] = cb.checked; save(); render(); });
+  document.querySelectorAll("[data-bind]").forEach(el => el.addEventListener("change", () => { c[el.dataset.bind] = el.value.trim(); save(); render(); }));
+}
+
+/* =============================== render =============================== */
+function render(){
+  renderHeader();
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === db.tab));
+  const v = document.getElementById("view");
+  if (db.tab === "design")      { v.innerHTML = renderDesign();    wireDesign(); }
+  else if (db.tab === "build")  { v.innerHTML = renderBuild();     wireBuild(); }
+  else                          { v.innerHTML = renderDiscovery(); wireDiscovery(); }
+}
+render();
+</script>

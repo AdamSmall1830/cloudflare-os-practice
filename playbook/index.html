@@ -1,0 +1,939 @@
+<meta charset="utf-8">
+<title>Cloudflare OS Delivery Playbook</title>
+<style>
+  :root {
+    --paper: #F6F5F2;
+    --surface: #FFFFFF;
+    --ink: #211D18;
+    --ink-soft: #5C554C;
+    --line: #DDD8D0;
+    --ember: #D14E00;
+    --ember-soft: #FBEDE3;
+    --slate: #44607A;
+    --slate-soft: #E9EEF3;
+    --moss: #3E7A4E;
+    --moss-soft: #E7F0E9;
+    --warn: #9A6B12;
+    --warn-soft: #F7EEDB;
+    --mono: "SF Mono", ui-monospace, "Cascadia Code", Consolas, "Liberation Mono", monospace;
+    --display: Futura, "Century Gothic", "URW Gothic", "Avenir Next", "Segoe UI", sans-serif;
+    --body: "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171412;
+      --surface: #201C18;
+      --ink: #EAE5DE;
+      --ink-soft: #A89F93;
+      --line: #38322B;
+      --ember: #FF8A3D;
+      --ember-soft: #33241A;
+      --slate: #8FB0CC;
+      --slate-soft: #1E2831;
+      --moss: #7FB58D;
+      --moss-soft: #1D2A20;
+      --warn: #D9A94A;
+      --warn-soft: #2E2717;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #171412;
+    --surface: #201C18;
+    --ink: #EAE5DE;
+    --ink-soft: #A89F93;
+    --line: #38322B;
+    --ember: #FF8A3D;
+    --ember-soft: #33241A;
+    --slate: #8FB0CC;
+    --slate-soft: #1E2831;
+    --moss: #7FB58D;
+    --moss-soft: #1D2A20;
+    --warn: #D9A94A;
+    --warn-soft: #2E2717;
+  }
+  :root[data-theme="light"] {
+    --paper: #F6F5F2;
+    --surface: #FFFFFF;
+    --ink: #211D18;
+    --ink-soft: #5C554C;
+    --line: #DDD8D0;
+    --ember: #D14E00;
+    --ember-soft: #FBEDE3;
+    --slate: #44607A;
+    --slate-soft: #E9EEF3;
+    --moss: #3E7A4E;
+    --moss-soft: #E7F0E9;
+    --warn: #9A6B12;
+    --warn-soft: #F7EEDB;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    line-height: 1.65;
+    margin: 0;
+    font-size: 16px;
+  }
+  .wrap { max-width: 76rem; margin: 0 auto; padding: 0 1.25rem 6rem; }
+  .prose { max-width: 46rem; }
+
+  /* ---------- Masthead ---------- */
+  .masthead { padding: 3.5rem 0 2.5rem; border-bottom: 3px solid var(--ink); }
+  .eyebrow {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 0.72rem;
+    color: var(--ember);
+    display: flex; gap: 1rem; flex-wrap: wrap;
+  }
+  .eyebrow .dim { color: var(--ink-soft); }
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(1.9rem, 4.5vw, 3.1rem);
+    line-height: 1.08;
+    letter-spacing: 0.01em;
+    margin: 0.9rem 0 1rem;
+    text-wrap: balance;
+    max-width: 22ch;
+  }
+  .dek { font-size: 1.08rem; color: var(--ink-soft); max-width: 52rem; margin: 0; }
+  .dek strong { color: var(--ink); }
+
+  /* ---------- TOC ---------- */
+  .toc {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0;
+    margin: 2rem 0 0;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .toc a {
+    display: block;
+    padding: 0.7rem 0.9rem;
+    text-decoration: none;
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+  .toc a:hover, .toc a:focus-visible { background: var(--ember-soft); color: var(--ember); outline: none; }
+  .toc a .n { color: var(--ember); margin-right: 0.5rem; font-variant-numeric: tabular-nums; }
+
+  /* ---------- Sections ---------- */
+  section { padding: 3rem 0 1rem; scroll-margin-top: 1rem; }
+  .sec-head { display: flex; align-items: baseline; gap: 1rem; border-bottom: 1px solid var(--line); padding-bottom: 0.6rem; margin-bottom: 1.6rem; }
+  .sec-num {
+    font-family: var(--display);
+    color: var(--ember);
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    font-variant-numeric: tabular-nums;
+  }
+  h2 {
+    font-family: var(--display);
+    font-size: clamp(1.3rem, 2.6vw, 1.75rem);
+    letter-spacing: 0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 { font-family: var(--display); font-size: 1.08rem; letter-spacing: 0.03em; margin: 1.8rem 0 0.5rem; }
+  h4 {
+    font-family: var(--display);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--slate);
+    margin: 0 0 0.4rem;
+  }
+  p { margin: 0 0 1rem; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.2rem; }
+  li { margin-bottom: 0.35rem; }
+  li::marker { color: var(--ember); }
+  a { color: var(--ember); }
+  code { font-family: var(--mono); font-size: 0.85em; background: var(--surface); border: 1px solid var(--line); padding: 0.08em 0.35em; border-radius: 3px; }
+  strong { font-weight: 600; }
+
+  /* ---------- Callouts ---------- */
+  .callout { border: 1px solid var(--line); border-left: 4px solid var(--slate); background: var(--surface); padding: 1rem 1.2rem; margin: 1.4rem 0; max-width: 50rem; }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.go { border-left-color: var(--moss); }
+  .callout h4 { margin-bottom: 0.5rem; }
+  .callout.warn h4 { color: var(--warn); }
+  .callout.go h4 { color: var(--moss); }
+  .callout p:last-child, .callout ul:last-child, .callout ol:last-child { margin-bottom: 0; }
+
+  /* ---------- Tables ---------- */
+  .tbl-scroll { overflow-x: auto; margin: 1.2rem 0 1.6rem; border: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; min-width: 40rem; background: var(--surface); font-size: 0.92rem; }
+  th {
+    font-family: var(--display); text-align: left; font-size: 0.7rem;
+    text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-soft);
+    padding: 0.6rem 0.9rem; border-bottom: 2px solid var(--ink); white-space: nowrap;
+  }
+  td { padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  td .soft { color: var(--ink-soft); font-weight: 400; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- Phases ---------- */
+  .phase { display: grid; grid-template-columns: 7.5rem 1fr; gap: 1.4rem; padding: 1.6rem 0; border-bottom: 1px solid var(--line); }
+  .phase:last-of-type { border-bottom: none; }
+  .phase-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2.6rem; height: 2.6rem; border: 2px solid var(--ember); color: var(--ember);
+    font-family: var(--display); font-size: 1.15rem; font-variant-numeric: tabular-nums;
+  }
+  .phase-dur { display: block; margin-top: 0.5rem; font-family: var(--mono); font-size: 0.72rem; color: var(--ink-soft); }
+  .phase-body h3 { margin-top: 0.1rem; }
+  .phase-body { max-width: 46rem; }
+  .kv { margin: 0.7rem 0 0; padding: 0.6rem 0.9rem; background: var(--surface); border: 1px solid var(--line); font-size: 0.9rem; }
+  .kv b { font-family: var(--display); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--slate); display: block; margin-bottom: 0.15rem; }
+  .kv + .kv { border-top: none; }
+  .kv.exit b { color: var(--moss); }
+  .tool { margin: 1rem 0 0; padding: 0.9rem 1.1rem; background: var(--slate-soft); border-left: 3px solid var(--slate); font-size: 0.92rem; }
+  .tool h4 { color: var(--slate); }
+  .tool ul, .tool ol { margin-bottom: 0; }
+  @media (max-width: 640px) {
+    .phase { grid-template-columns: 1fr; gap: 0.4rem; }
+    .phase-side { display: flex; align-items: center; gap: 0.8rem; }
+    .phase-dur { margin-top: 0; }
+  }
+
+  /* ---------- Checklists ---------- */
+  ul.checklist { list-style: none; padding-left: 0; }
+  ul.checklist li { padding-left: 1.7rem; position: relative; margin-bottom: 0.5rem; }
+  ul.checklist li::before {
+    content: ""; position: absolute; left: 0; top: 0.32em;
+    width: 0.85em; height: 0.85em; border: 2px solid var(--ember); background: var(--surface);
+  }
+  .check-group { border: 1px solid var(--line); background: var(--surface); padding: 1.1rem 1.3rem; margin: 1.2rem 0; }
+  .check-group h4 { color: var(--ember); }
+  .check-group ul.checklist { margin-bottom: 0; font-size: 0.94rem; }
+  .check-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 1.2rem; }
+
+  /* ---------- Verticals ---------- */
+  .vertical { border: 1px solid var(--line); background: var(--surface); margin: 1.6rem 0; padding: 1.4rem 1.5rem 1.5rem; }
+  .vertical > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+  .vertical .sub { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-soft); font-weight: 400; }
+  .v-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1.2rem 1.6rem; margin-top: 0.9rem; }
+  .v-grid ul { margin-bottom: 0; padding-left: 1.05rem; font-size: 0.92rem; }
+  .wallets-note { margin: 1.1rem 0 0; padding: 0.7rem 0.9rem; background: var(--ember-soft); border-left: 3px solid var(--ember); font-size: 0.92rem; }
+  .wallets-note b { color: var(--ember); font-family: var(--display); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; display: block; margin-bottom: 0.15rem; }
+  .guard-note { margin: 1.1rem 0 0; padding: 0.7rem 0.9rem; background: var(--slate-soft); border-left: 3px solid var(--slate); font-size: 0.92rem; }
+  .guard-note b { color: var(--slate); font-family: var(--display); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; display: block; margin-bottom: 0.15rem; }
+
+  /* ---------- FAQ ---------- */
+  .faq { max-width: 50rem; }
+  .faq-item { border: 1px solid var(--line); background: var(--surface); padding: 1rem 1.2rem; margin-bottom: 0.9rem; }
+  .faq-item h4 { color: var(--ink); font-size: 0.86rem; letter-spacing: 0.06em; text-transform: none; margin-bottom: 0.35rem; }
+  .faq-item h4::before { content: "Q · "; color: var(--ember); }
+  .faq-item p { margin-bottom: 0; font-size: 0.95rem; }
+
+  /* ---------- Diagram ---------- */
+  .diagram { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); padding: 1.2rem; margin: 1.4rem 0; }
+  .diagram pre.mermaid { min-width: 40rem; margin: 0; }
+
+  /* ---------- Footer ---------- */
+  footer { border-top: 3px solid var(--ink); margin-top: 3rem; padding-top: 1.6rem; font-size: 0.9rem; color: var(--ink-soft); }
+  footer ul { padding-left: 1.1rem; }
+  .backtop { font-family: var(--display); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.14em; text-decoration: none; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+</style>
+
+<div class="wrap">
+
+<header class="masthead" id="top">
+  <p class="eyebrow"><span>Field Manual</span> <span class="dim">Cloudflare OS · Open-sourced Aug 5, 2026 · Apache-2.0</span> <span class="dim">v2 — vendor edition</span></p>
+  <h1>The Cloudflare OS Client Delivery Playbook</h1>
+  <p class="dek">The complete vendor manual for standing up <strong>Cloudflare OS</strong> — the open-source agent workspace Cloudflare just released — as a <strong>governed, centralized AI operating layer</strong> for client businesses. Covers what you build before the first client, discovery instruments, the phase-by-phase delivery roadmap, a literal client-setup checklist, vertical playbooks, costs and pricing, IT objection handling, training, and the Cloudflare Wallets track.</p>
+  <nav class="toc" aria-label="Contents">
+    <a href="#platform"><span class="n">01</span>What it actually is</a>
+    <a href="#architecture"><span class="n">02</span>Reference architecture</a>
+    <a href="#practice"><span class="n">03</span>Before the first client</a>
+    <a href="#roadmap"><span class="n">04</span>Delivery roadmap</a>
+    <a href="#setup"><span class="n">05</span>Client setup checklist</a>
+    <a href="#verticals"><span class="n">06</span>Vertical playbooks</a>
+    <a href="#wallets"><span class="n">07</span>Wallets track</a>
+    <a href="#training"><span class="n">08</span>Training &amp; acceptance</a>
+    <a href="#commercials"><span class="n">09</span>Costs &amp; pricing</a>
+    <a href="#faq"><span class="n">10</span>IT &amp; security FAQ</a>
+    <a href="#risks"><span class="n">11</span>Risks &amp; caveats</a>
+    <a href="#factory"><span class="n">12</span>Delivery factory</a>
+  </nav>
+</header>
+
+<!-- ============================================================ -->
+<section id="platform">
+  <div class="sec-head"><span class="sec-num">01</span><h2>What Cloudflare OS actually is</h2></div>
+  <div class="prose">
+    <p>Cloudflare OS is Cloudflare's internal AI workspace, open-sourced under <strong>Apache-2.0</strong> on August 5, 2026 after roughly a year of internal use by thousands of employees across sales, engineering, IT, investor relations, and business development. It is a browser-based <strong>agent workspace built on Cloudflare Workers</strong>: every employee gets a chat-driven workspace grounded in the company's curated knowledge, with agents that produce living documents, build small applications, and act on external systems — under a capability-based security model.</p>
+    <p>Two things make it genuinely different from "a chatbot with connectors," and both matter commercially:</p>
+    <ul>
+      <li><strong>Per-user sandboxed software ("Apps" / "Gadgets").</strong> Instead of one shared SaaS instance, every user runs their own copy of each app — a Dynamic Worker with its own SQLite database (Durable Object Facets). Agents can modify a user's copy without affecting anyone else. Sharing an app gives real-time collaboration on shared state with two roles (<code>build</code> — edit code, use AI chat, manage bindings; <code>use</code> — interact with the UI only); sharing its <em>Blueprint</em> gives someone their own fresh copy. Collaborators always use their <em>own</em> model budgets and their <em>own</em> third-party connections — sharing an app never leaks the owner's external accounts.</li>
+      <li><strong>Gatekeepers.</strong> Every external system is reached only through a service-specific Worker that <em>holds the credential, enforces policy, records everything read, and mediates anything with an externally visible side effect</em>. Agents and apps start with access to nothing. This is the piece that makes "centralized, controlled AI" a real claim rather than a slide.</li>
+    </ul>
+
+    <h3>The primitives you will be selling</h3>
+  </div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Primitive</th><th>What it is</th><th>Why the client cares</th></tr></thead>
+      <tbody>
+        <tr><td>Workspaces</td><td>Browser chat + files + isolated code runtime per user, grounded in org context</td><td>Every employee gets an agent that knows the company — no terminal required</td></tr>
+        <tr><td>Skills &amp; Context</td><td>Curated instruction library (<code>.agents/skills/</code>): terminology, procedures, best-known methods</td><td>This is where "your company's way of working" gets encoded — the highest-value consulting artifact</td></tr>
+        <tr><td>Documents / Slides / Sheets</td><td>Outputs that stay connected to live data, exportable to Google Drive etc.</td><td>Reports that update themselves instead of dying in a folder</td></tr>
+        <tr><td>Apps &amp; Blueprints</td><td>Full-stack mini-apps (Dynamic Workers + Durable Object SQLite, Cap'n Web RPC), shared live or as templates</td><td>Departmental micro-tools without a software project — the "long tail" IT never builds</td></tr>
+        <tr><td>Workflows</td><td>Deterministic job sequences — code for predictable steps, models only where judgment is needed; on-demand, scheduled, or event-triggered</td><td>Reliable automation (digests, triage, syncs) that doesn't drift the way pure-LLM automation does</td></tr>
+        <tr><td>Gatekeepers</td><td>Credential-holding policy Workers per external system, with observation logging and approval queues</td><td>Security, auditability, and human-in-the-loop on every side effect</td></tr>
+        <tr><td>AI Gateway</td><td>Single routing point for any model provider, with per-person/team budgets, attribution, rate limits, and a configurable free daily allowance per user</td><td>Cost control and model governance — frontier models for high-value work only</td></tr>
+        <tr><td>Sign-in</td><td>Cloudflare Access (IdP SSO), password auth, and/or OAuth "auth gatekeepers" (Google, GitHub, Cloudflare); identity keyed to verified email</td><td>Fits whatever identity setup the client already has, from Okta to plain Google Workspace</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h3>The security model, in one paragraph</h3>
+    <p>Agents and apps start with <strong>zero access</strong>; capabilities are granted explicitly and credentials never touch agent code. The platform <strong>records every resource an agent observes</strong>, and those observations travel with the work — when someone opens a shared workspace or document, Gatekeepers verify <em>that person's</em> access to every observed resource before showing it. Server code runs with outbound networking disabled; sensitive reads can taint a session and restrict what the agent may do next (no external sends, no new collaborators). Side effects — merging a PR, sending an email, issuing a refund — can be queued behind human approval, and agents keep working on a simulated outcome while approval is pending. Share links are stored as HMAC hashes and revocable, with sessions force-restarted when access changes. For regulated clients, the observation log is the audit trail.</p>
+
+    <h3>What ships today</h3>
+    <p>The core repo (<code>cloudflare/cloudflare-os</code>), a hosted deploy flow at <code>os.cloudflare.app/deploy</code>, and a starter deployment repo (<code>cloudflare/cloudflare-os-starter</code>) that wraps a <strong>pinned release</strong> with your branding, sign-in, routes, custom Gatekeepers, and upgrade control — customization without patching upstream. Stock Gatekeepers exist for <strong>GitHub, Google APIs, Slack, Notion, Confluence, Supabase, Email Workers, the Cloudflare API, Home Assistant, Spotify, and ZoomInfo</strong>. Everything else a client needs — CRM, QuickBooks Online, merchant processor, EMR, ERP, Microsoft 365 — is a custom Gatekeeper you build. That gap is the core of the services business.</p>
+  </div>
+
+  <div class="callout warn">
+    <h4>Maturity check — set expectations honestly</h4>
+    <ul>
+      <li>v2 is a <strong>complete rewrite</strong>, self-described as early access with "many rough edges"; upstream accepts only trivial PRs right now. Pin releases and plan deliberate upgrade windows — never track main for a client.</li>
+      <li>The managed dashboard product, container support, and Slack-embedded workspaces are <em>roadmap</em>, not shipped. Sell what exists.</li>
+      <li>Cloudflare's named implementation partners are Presidio and Happy Cog — the partner motion is real and sanctioned; pursue it formally (Section 03).</li>
+      <li>It runs on <code>workerd</code>, the open-source runtime, under Apache-2.0 — a genuine self-host / exit path and a permissive license you can build a proprietary practice on.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="architecture">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Reference architecture for a client deployment</h2></div>
+  <div class="prose">
+    <p>Every engagement lands the same shape: the client's own Cloudflare account, a pinned Cloudflare OS release deployed from the starter repo, Cloudflare Access in front, AI Gateway underneath, and a ring of Gatekeepers connecting to the systems the business already runs. The client owns the account, the data, and the credentials; you own the build and the runbook until handoff.</p>
+  </div>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  U[Employees<br/>browser] --> A[Cloudflare Access<br/>SSO via client IdP]
+  A --> OS[Cloudflare OS<br/>pinned release, starter-wrapped<br/>Workspaces · Docs · Apps · Workflows]
+  OS --> GW[AI Gateway<br/>model routing · budgets · attribution]
+  GW --> M[Model providers<br/>Anthropic · OpenAI · Workers AI · …]
+  OS --> GK{{Gatekeepers<br/>credentials · policy · audit · approvals}}
+  GK --> CRM[CRM<br/>HubSpot / Salesforce / vertical]
+  GK --> FIN[QuickBooks Online<br/>+ merchant processor]
+  GK --> COM[Email &amp; Calendar<br/>Google / Microsoft 365]
+  GK --> KB[Knowledge bases<br/>R2 + AI Search · Notion · Drive]
+  GK --> LOB[Line-of-business<br/>ERP · DMS · EMR · portfolio systems]
+  LOB -.on-prem via Cloudflare Mesh / Tunnel.- GK
+    </pre>
+  </div>
+
+  <div class="prose"><h3>The client-side bill of materials</h3></div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Layer</th><th>Components</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Identity</td><td>Cloudflare Access app + client IdP (Entra ID, Google Workspace, Okta); or OAuth auth-gatekeepers (<code>AUTH_GATEKEEPERS</code>)</td><td>Access for orgs with an IdP; Google OAuth sign-in for small clients without one. <code>DISABLE_PASSWORD_AUTH=true</code> once SSO works</td></tr>
+        <tr><td>Platform</td><td>Workers (paid), Durable Objects, 3× KV namespaces, R2 bucket</td><td>Auto-provisioned by the starter deploy, or bound to existing resources</td></tr>
+        <tr><td>Models</td><td>AI Gateway (<code>CF_AI_GATEWAY</code> vars) + provider keys; Workers AI optional</td><td>Org-funded via the platform gateway; throttle with the per-user daily allowance (<code>DAILY_LLM_CALL_LIMIT</code>, default 100 calls/day)</td></tr>
+        <tr><td>Core OS</td><td>Pinned <code>cloudflare-os</code> release via <code>cloudflare-os-starter</code></td><td>Branding via <code>/admin</code> (no redeploy); infra changes via <code>deployment.jsonc</code> (redeploy). Starter requires Node 24 + pnpm 11</td></tr>
+        <tr><td>Integrations</td><td>Stock Gatekeepers + custom Gatekeepers in <code>packages/custom-gatekeeper</code></td><td>Each custom Gatekeeper is its own Worker with service bindings — separately deployable and testable</td></tr>
+        <tr><td>Knowledge</td><td>R2 + AI Search (hybrid retrieval), Notion/Confluence Gatekeepers, skills library</td><td>Skills files are versioned like code — treat them as the client's process IP</td></tr>
+        <tr><td>Private reach</td><td>Cloudflare Mesh / Tunnel for on-prem systems</td><td>How agents reach an ERP, MES, or DMS that never touches the public internet</td></tr>
+        <tr><td>Ops</td><td>Error-reporting Worker, logs/traces per observability guide</td><td>Ships in the starter; wire to the client's log destination</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <h4>Build order for integrations — cheapest trust first</h4>
+    <p>Stock Gatekeepers (Google email/calendar, Slack, Notion/Confluence) land in days and produce visible wins immediately. Custom Gatekeepers follow in value order: <strong>CRM → QuickBooks Online → merchant processor → line-of-business system</strong>. Start every Gatekeeper read-only; add writes behind approval queues only after the pilot proves the read path.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="practice">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Before the first client — building the practice</h2></div>
+  <div class="prose">
+    <p>Everything in this section is built once, on your own account and your own time, and amortized across every client. Budget <strong>3–5 weeks</strong> before the first serious pitch. The single most important asset is a working showroom — this product demos far better than it describes.</p>
+
+    <h3>The showroom deployment</h3>
+    <p>Deploy your own tenant from the starter repo (or bootstrap via <code>os.cloudflare.app/deploy</code>, then migrate to starter-managed) at your own domain. Seed it with fictional-but-realistic data for your two lead verticals — a fake clinic, a fake job shop — and build the 20-minute demo arc: <em>ask a question grounded in company knowledge → generate a live document → have the agent build a small gadget → trigger an action that lands in the approval queue → open the observation log</em>. The approval queue and the audit trail are the close; decision-makers have seen chatbots, they have not seen governed side effects.</p>
+
+    <h3>The reusable IP library</h3>
+    <p>Keep a private practice monorepo, versioned like a product. Per-client work becomes instantiation + policy, not invention:</p>
+    <ul>
+      <li><strong>Gatekeeper library</strong> — QuickBooks Online, Stripe, HubSpot, Salesforce, Microsoft Graph (M365 mail/calendar), plus one vertical system per target industry. Each with a policy template (scopes, approval rules) and an integration test suite.</li>
+      <li><strong>Skills starter kits</strong> — 10–15 skills per vertical (Section 06 lists the workflows they encode), plus a generic Codex template with the section headings every client fills in.</li>
+      <li><strong>Delivery collateral</strong> — discovery interview guide and scoring rubric (Section 04), client setup checklist (Section 05), SOW/MSA templates with IP and data-handling clauses, the security one-pager answering Section 10's FAQ, training decks for all four tracks, runbook templates.</li>
+    </ul>
+
+    <h3>Positioning and partnerships</h3>
+    <ul>
+      <li>Apply to the Cloudflare partner network and reference the sanctioned implementation-partner motion (Presidio, Happy Cog). Being listed matters for mid-market credibility.</li>
+      <li>Run your own practice <em>on</em> Cloudflare OS — your CRM, your QBO, your proposals. It is the best testbed and the best proof. Section 12 maps the full client-acquisition-to-deployment pipeline this grows into.</li>
+      <li>Apache-2.0 means your custom Gatekeepers and skills kits can be proprietary or client-assigned per SOW — decide the default now and put it in the MSA (recommended: client owns their policy config and Codex; you retain the reusable Gatekeeper code, licensed to them perpetually).</li>
+    </ul>
+
+    <h3>Team shape</h3>
+    <p>Solo-operator viable at the start with contractors for training days. The four hats that must be worn: <strong>engagement lead</strong> (discovery, governance, exec relationship), <strong>integration engineer</strong> (Gatekeepers, deployment, TypeScript/Workers), <strong>knowledge engineer</strong> (Codex, skills, retrieval tuning), <strong>trainer</strong>. First hire when pipeline demands it: the integration engineer.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="roadmap">
+  <div class="sec-head"><span class="sec-num">04</span><h2>The delivery roadmap — discovery to handoff</h2></div>
+  <div class="prose">
+    <p>A full engagement for a mid-market client (25–500 seats) runs <strong>14–16 weeks</strong> across eight phases; a small clinic or firm compresses to 8–10 weeks by shrinking discovery and running one integration wave. Phases 3 and 4 deliberately overlap — integrations and knowledge curation are parallel workstreams with different skill sets.</p>
+  </div>
+
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Phase</th><th>Weeks</th><th>Lead hat</th><th>Headline output</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0 · Qualify</td><td class="num">0</td><td>Engagement lead</td><td>Signed scope, compliance profile, prerequisites list</td></tr>
+        <tr><td class="num">1 · Discovery</td><td class="num">1–3</td><td>Engagement lead</td><td>Scored use-case register, integration map, pilot charter</td></tr>
+        <tr><td class="num">2 · Foundation</td><td class="num">3–4</td><td>Integration engineer</td><td>Live workspace behind client SSO, model budgets live</td></tr>
+        <tr><td class="num">3 · Integrations</td><td class="num">4–8</td><td>Integration engineer</td><td>Gatekeepers deployed with policy + approval queues</td></tr>
+        <tr><td class="num">4 · Knowledge</td><td class="num">4–8</td><td>Knowledge engineer</td><td>Client Codex v1, skills library, retrieval live</td></tr>
+        <tr><td class="num">5 · Pilot</td><td class="num">8–11</td><td>Engagement lead</td><td>Measured wins, go/no-go per workflow</td></tr>
+        <tr><td class="num">6 · Rollout</td><td class="num">11–14</td><td>Trainer</td><td>Department waves live, Blueprint library seeded</td></tr>
+        <tr><td class="num">7 · Handoff</td><td class="num">14–16</td><td>Engagement lead</td><td>Acceptance checklist signed, governance running</td></tr>
+        <tr><td class="num">8 · Wallets <span class="soft">(optional)</span></td><td class="num">post</td><td>Integration engineer</td><td>Governed agent spend / monetized API</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="phase">
+    <div class="phase-side"><span class="phase-num">0</span><span class="phase-dur">Week 0</span></div>
+    <div class="phase-body">
+      <h3>Qualification &amp; readiness</h3>
+      <p>Confirm the client is a fit before selling a build: real volumes of repetitive knowledge work, systems with usable APIs, an executive sponsor who will enforce adoption, and a compliance profile you can serve (HIPAA, SEC/FINRA, attorney confidentiality). Establish who owns the Cloudflare account and what data-protection paperwork is required (BAA for healthcare, DPA generally). Hand over the Section 05 setup checklist now — credential gathering is always the long pole.</p>
+      <div class="kv"><b>Deliverables</b> Engagement scope, compliance checklist, prerequisites list issued.</div>
+      <div class="kv exit"><b>Exit criteria</b> Signed scope; sponsor named; Cloudflare account (or plan to create one) confirmed.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-side"><span class="phase-num">1</span><span class="phase-dur">Weeks 1–3</span></div>
+    <div class="phase-body">
+      <h3>Customer discovery</h3>
+      <p>Steal Cloudflare's own internal playbook. Run stakeholder interviews per department, then set up a <strong>"magic inbox"</strong> — an alias like <code>routine@client.com</code> where employees forward or cc every repetitive task for two weeks. Cluster the contents weekly; that inbox becomes an evidence-based automation catalog in the company's own vocabulary. In parallel, inventory systems and their APIs, and map data sensitivity (what is PHI, privileged, PII, financial).</p>
+      <div class="tool">
+        <h4>Interview guide — the ten questions that surface automatable work</h4>
+        <ol>
+          <li>Walk me through yesterday morning, task by task.</li>
+          <li>What do you redo every week or month that feels identical each time?</li>
+          <li>What takes a new hire longest to learn?</li>
+          <li>Which emails or messages do you dread, and why?</li>
+          <li>What information lives only in one person's head?</li>
+          <li>What reports do you produce — for whom, from which systems, how often?</li>
+          <li>Where do you wait on approvals, and how long?</li>
+          <li>Between which systems do you re-key the same data?</li>
+          <li>If you got five hours back a week, what would you spend them on?</li>
+          <li>What should <em>never</em> be automated here?</li>
+        </ol>
+      </div>
+      <div class="tool">
+        <h4>Scoring rubric — rank every candidate use case</h4>
+        <ul>
+          <li><strong>Value</strong> = frequency/week × minutes per occurrence × people affected.</li>
+          <li><strong>Feasibility</strong> 1–5: API quality, data accessibility, output verifiability.</li>
+          <li><strong>Risk tier</strong>: A read-only · B write behind approval · C external side effects. Pilot from high-value, high-feasibility, tier A/B.</li>
+        </ul>
+      </div>
+      <ul>
+        <li>Select <strong>3–5 pilot workflows</strong> — at least one with a same-week payoff (email/meeting digest class) and one that touches the CRM or books (proves the governed-integration story).</li>
+        <li>Identify 2–4 <strong>champions</strong> — respected early adopters per department, per Cloudflare's own rollout model. Not necessarily technical; necessarily influential.</li>
+      </ul>
+      <div class="kv"><b>Deliverables</b> Use-Case Register (scored), Integration Map, Data Sensitivity &amp; Policy Matrix, Pilot Charter, champion roster.</div>
+      <div class="kv exit"><b>Exit criteria</b> Sponsor signs the pilot charter and the policy matrix — especially which actions require human approval.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-side"><span class="phase-num">2</span><span class="phase-dur">Weeks 3–4</span></div>
+    <div class="phase-body">
+      <h3>Foundation deployment</h3>
+      <p>Stand up the platform in the client's Cloudflare account using the starter repo: Node 24 + pnpm 11 + authenticated Wrangler; fill <code>deployment.jsonc</code> (account ID, hostname in an active DNS zone, Access audience, admin emails); <code>pnpm check</code> then <code>pnpm deploy</code>. Configure sign-in for the client's reality: Cloudflare Access bound to their IdP for orgs that have one, or Google OAuth via <code>AUTH_GATEKEEPERS=google</code> with a domain allowlist for small shops — then <code>DISABLE_PASSWORD_AUTH=true</code>. Configure AI Gateway with the agreed model matrix, per-team budgets, and the per-user daily allowance; brand via <code>/admin</code>; verify error reporting and logs land where IT can see them. Stand up a <strong>staging deployment</strong> at the same time — it is the upgrade-testing target for the life of the account.</p>
+      <div class="kv"><b>Deliverables</b> Production + staging workspaces at client hostnames behind SSO; model/budget policy in effect; observability wired.</div>
+      <div class="kv exit"><b>Exit criteria</b> Admins and champions sign in with company credentials; a test workspace produces a document; spend shows up attributed in AI Gateway.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-side"><span class="phase-num">3</span><span class="phase-dur">Weeks 4–8</span></div>
+    <div class="phase-body">
+      <h3>Integration build — Gatekeepers</h3>
+      <p>Connect the systems from the Integration Map, stock first, then custom. Every custom Gatekeeper follows the same discipline: typed bindings for <em>specific</em> resources (this pipeline, this ledger, this matter — never "the whole API"), read-only first, side effects behind an approval queue, and full observation logging. Custom Gatekeepers live in <code>packages/custom-gatekeeper</code> as separate Workers with service bindings, so they deploy and test independently of the OS core — instantiate from your practice library and apply client policy.</p>
+      <ul>
+        <li><strong>Wave 1 (stock):</strong> email + calendar (Google Gatekeeper; Microsoft 365 is custom via Graph), Slack, Notion/Confluence.</li>
+        <li><strong>Wave 2 (custom, cross-industry):</strong> CRM; QuickBooks Online; merchant processor (Stripe/Square).</li>
+        <li><strong>Wave 3 (custom, vertical):</strong> the line-of-business system — ERP, practice management, DMS, EMR, portfolio platform — reached over Mesh/Tunnel if on-prem.</li>
+      </ul>
+      <div class="kv"><b>Deliverables</b> Deployed Gatekeepers with policy docs per system; integration test suites; approval-queue routing (who approves what, in Slack/email).</div>
+      <div class="kv exit"><b>Exit criteria</b> Each pilot workflow can reach every system it needs; a red-team pass confirms agents cannot exceed granted scopes; approvals reach the right humans.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-side"><span class="phase-num">4</span><span class="phase-dur">Weeks 4–8 · parallel</span></div>
+    <div class="phase-body">
+      <h3>Knowledge &amp; skills curation</h3>
+      <p>This is where the deployment becomes <em>their</em> OS. Cloudflare's stated principle — "the context from the organization matters more than the model" — is the pitch. Build the client's <strong>Codex</strong>: an authoritative, opinionated guide to how the business works (their Engineering Codex equivalent — for a law firm the practice manual; for a clinic, the front-office and documentation standards). Convert SOPs from the magic inbox into <strong>skills files</strong>, starting from your vertical kit; load reference corpora into R2 + AI Search; connect the existing wiki through its Gatekeeper; build document/slide templates in the house style.</p>
+      <div class="kv"><b>Deliverables</b> Client Codex v1, 10–25 skills files covering the pilot workflows, retrieval sources live, branded templates.</div>
+      <div class="kv exit"><b>Exit criteria</b> A champion runs a pilot workflow cold and the agent uses the right vocabulary, process, and sources — verified against the observation log.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-side"><span class="phase-num">5</span><span class="phase-dur">Weeks 8–11</span></div>
+    <div class="phase-body">
+      <h3>Pilot</h3>
+      <p>5–15 users including all champions, running the 3–5 charter workflows in real work. Instrument from day one: hours saved per workflow (self-reported + sampled), approval-queue latency (slow approvers kill agent value), error/rework rate, and model spend per workspace from AI Gateway. Hold a weekly tuning session: tighten skills, adjust Gatekeeper policy, promote useful one-off gadgets into shared Blueprints.</p>
+      <div class="kv"><b>Deliverables</b> Weekly metrics, revised skills/policies, pilot report with go/no-go per workflow.</div>
+      <div class="kv exit"><b>Exit criteria</b> ≥3 workflows with measured wins champions will vouch for; spend per user within budget; zero unauthorized-access findings in the observation logs.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-side"><span class="phase-num">6</span><span class="phase-dur">Weeks 11–14</span></div>
+    <div class="phase-body">
+      <h3>Rollout &amp; training</h3>
+      <p>Department-by-department waves, each opened by its champion demoing real wins from the pilot — never a generic AI demo. Run the role-based curriculum (Section 08), stand up champion office hours, and seed the <strong>Blueprint library</strong> so each new department starts from working examples. Publish the internal directory of what the OS can do, in the client's own vocabulary.</p>
+      <div class="kv"><b>Deliverables</b> All-hands launch, per-department sessions, Blueprint library, internal capability directory, office-hours cadence.</div>
+      <div class="kv exit"><b>Exit criteria</b> ≥60% weekly active usage in rolled-out departments; each department has one champion and at least one department-specific workflow live.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-side"><span class="phase-num">7</span><span class="phase-dur">Weeks 14–16</span></div>
+    <div class="phase-body">
+      <h3>Handoff &amp; operations</h3>
+      <p>Transfer ownership deliberately against the signable acceptance checklist in Section 08. Admin training covers <code>deployment.jsonc</code>, Access policy, AI Gateway budgets, Gatekeeper credential rotation, and the <strong>upgrade runbook</strong>: monthly pinned-release bumps tested in staging before production — non-negotiable while upstream is in heavy development. Establish a client-side governance council (sponsor + IT + one champion per department) that owns the policy matrix, model budgets, and the skills backlog. Rotate every credential you touched. Agree the support tier: full handoff, or managed service.</p>
+      <div class="kv"><b>Deliverables</b> Admin &amp; ops runbooks, upgrade calendar, governance charter, metrics dashboard, 30/60/90-day adoption plan, signed acceptance checklist, support agreement.</div>
+      <div class="kv exit"><b>Exit criteria</b> Every item on the acceptance checklist demonstrated, not promised.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-side"><span class="phase-num">8</span><span class="phase-dur">Optional · post-rollout</span></div>
+    <div class="phase-body">
+      <h3>Agentic commerce — the Wallets track</h3>
+      <p>Only after the OS is bedded in, and only for clients with a real metered-spend or API-monetization story. Detailed in Section 07.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="setup">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Client setup checklist — what to collect, in order</h2></div>
+  <div class="prose">
+    <p>Issue this at Phase 0 and chase it weekly; waiting on credentials is the number-one schedule killer. Everything is collected into the client's own systems — you request access, you never become the owner of record for any of it.</p>
+  </div>
+
+  <div class="check-cols">
+    <div class="check-group">
+      <h4>Commercial &amp; legal</h4>
+      <ul class="checklist">
+        <li>MSA + SOW signed (IP ownership of Gatekeepers/skills per Section 03)</li>
+        <li>DPA; BAA where PHI is in scope (with Cloudflare and with model providers — verify current availability before promising)</li>
+        <li>Named executive sponsor and IT owner with authority to approve the policy matrix</li>
+      </ul>
+    </div>
+    <div class="check-group">
+      <h4>Cloudflare account</h4>
+      <ul class="checklist">
+        <li>Client-owned Cloudflare account; Workers Paid plan enabled</li>
+        <li>DNS zone active (or subdomain delegated) for the workspace hostname + a staging hostname</li>
+        <li>Scoped admin seat or API token for your deploy user (revoked at handoff)</li>
+        <li>Wrangler-capable machine or CI runner agreed with IT (Node 24, pnpm 11)</li>
+      </ul>
+    </div>
+    <div class="check-group">
+      <h4>Identity &amp; people</h4>
+      <ul class="checklist">
+        <li>IdP admin contact; Access application created, audience tag captured for <code>deployment.jsonc</code> — or Google/GitHub OAuth app credentials if using auth-gatekeeper sign-in</li>
+        <li>Admin email list; full user roster with departments</li>
+        <li>Named approvers per approval queue (payments, outbound sends, filings)</li>
+        <li>Champion roster (2–4) and training calendar holds</li>
+      </ul>
+    </div>
+    <div class="check-group">
+      <h4>Models &amp; budgets</h4>
+      <ul class="checklist">
+        <li>Provider decision (Anthropic / OpenAI / Workers AI mix) + API keys issued to the client's own provider accounts</li>
+        <li>AI Gateway created; token with AI Gateway Run and Read permissions</li>
+        <li>Model matrix agreed: which tier for which task class</li>
+        <li>Budgets per team + per-user daily allowance value (<code>DAILY_LLM_CALL_LIMIT</code>)</li>
+      </ul>
+    </div>
+    <div class="check-group">
+      <h4>Per-system credentials <span style="text-transform:none">(as scoped)</span></h4>
+      <ul class="checklist">
+        <li>QuickBooks Online: Intuit developer app (OAuth2), sandbox company first, then production consent</li>
+        <li>Stripe/Square: restricted API key — read + refund scope only, no key with full account control</li>
+        <li>CRM: HubSpot private app token / Salesforce connected app with scoped profile</li>
+        <li>Google Workspace: OAuth app + admin consent for mail/calendar/Drive scopes in use</li>
+        <li>Microsoft 365: Entra app registration, Graph scopes, admin consent</li>
+        <li>Vertical system credentials (EMR, ERP, DMS, portfolio platform) + Mesh/Tunnel plan if on-prem</li>
+      </ul>
+    </div>
+    <div class="check-group">
+      <h4>Knowledge inputs</h4>
+      <ul class="checklist">
+        <li>SOP corpus export (docs, wikis, checklists) with owner per document</li>
+        <li>Wiki access (Notion/Confluence) for the stock Gatekeeper</li>
+        <li>Brand assets + document/slide house templates</li>
+        <li>Magic-inbox alias created and announced by the sponsor</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="verticals">
+  <div class="sec-head"><span class="sec-num">06</span><h2>Vertical playbooks</h2></div>
+  <div class="prose">
+    <p>The platform, phases, and governance model are identical across industries — what changes is which Gatekeepers you build, which knowledge you curate, and which regulator is looking over your shoulder. Each playbook lists the integration ring, the knowledge to curate, the first workflows to charter, and the guardrails that make the deployment defensible.</p>
+  </div>
+
+  <article class="vertical">
+    <h3>Manufacturing <span class="sub">job shops · discrete · light industrial</span></h3>
+    <div class="v-grid">
+      <div><h4>Systems to gatekeep</h4>
+        <ul><li>ERP — NetSuite, Epicor, SAP Business One (quotes, POs, inventory)</li><li>CMMS / maintenance system</li><li>MES / production data — <strong>read-only</strong>, via Mesh/Tunnel for on-prem</li><li>Supplier &amp; customer email, shared calendars</li></ul></div>
+      <div><h4>Knowledge bases</h4>
+        <ul><li>Work instructions &amp; SOPs</li><li>Quality manual (ISO 9001), CAPA history</li><li>Safety data sheets (SDS)</li><li>Quote/win history, supplier scorecards</li></ul></div>
+      <div><h4>First workflows</h4>
+        <ul><li>RFQ triage → draft quote from ERP cost history (approval before send)</li><li>Daily production &amp; downtime digest; downtime Pareto gadget</li><li>Supplier email triage → PO status answers</li><li>Maintenance ticket summarization; CAPA first drafts</li></ul></div>
+      <div><h4>Guardrails</h4>
+        <ul><li>OT/MES strictly read-only — agents never touch machine control</li><li>PO issuance and quote sends behind approval queues</li><li>Pricing data scoped to sales/estimating roles</li></ul></div>
+    </div>
+    <p class="wallets-note"><b>Wallets angle</b> Sell-side is the interesting play: expose parts availability, spec, or pricing data as an x402-metered API through the Monetization Gateway so distributors' and customers' agents can query (and pay) per call. Buy-side: metered commodity-pricing and logistics data APIs on capped Virtual Wallets.</p>
+  </article>
+
+  <article class="vertical">
+    <h3>Law firms <span class="sub">boutique to mid-size</span></h3>
+    <div class="v-grid">
+      <div><h4>Systems to gatekeep</h4>
+        <ul><li>DMS — iManage, NetDocuments (scoped per matter)</li><li>Practice management — Clio, PracticePanther (matters, time, billing)</li><li>Email &amp; calendar; court-deadline calendaring</li><li>Intake forms / website inquiries</li></ul></div>
+      <div><h4>Knowledge bases</h4>
+        <ul><li>Precedent bank &amp; clause library</li><li>Firm style guide and templates</li><li>Engagement letter &amp; fee structures</li><li>Jurisdiction-specific checklists</li></ul></div>
+      <div><h4>First workflows</h4>
+        <ul><li>Intake triage + conflicts <em>pre-check</em> (surfaces hits; a human clears them)</li><li>Matter chronology builder from the file</li><li>Prebill narrative scrub (time-entry language cleanup)</li><li>Deadline/docket digest; engagement-letter drafting</li></ul></div>
+      <div><h4>Guardrails</h4>
+        <ul><li>Ethical walls = Gatekeeper scoping per matter; verify-on-share blocks privileged data in shared docs</li><li>Nothing filed or sent externally without attorney approval</li><li>Model routing via AI Gateway to no-training, enterprise endpoints only</li><li>Observation logs double as the confidentiality audit trail</li></ul></div>
+    </div>
+    <p class="wallets-note"><b>Wallets angle</b> Thin. Pay-per-document public-records and court-data APIs on a capped Virtual Wallet, at most. Don't lead with it here.</p>
+  </article>
+
+  <article class="vertical">
+    <h3>Financial services <span class="sub">RIAs · wealth management · fee-only advisory</span></h3>
+    <div class="v-grid">
+      <div><h4>Systems to gatekeep</h4>
+        <ul><li>CRM — Wealthbox, Redtail, Salesforce FSC</li><li>Portfolio platform — Orion, Black Diamond, Tamarac (custodian data flows through these)</li><li>Planning — eMoney, RightCapital</li><li>Compliance archive; email &amp; calendar</li></ul></div>
+      <div><h4>Knowledge bases</h4>
+        <ul><li>Firm ADV, IPS templates, planning philosophy</li><li>Compliance manual; SEC Marketing Rule checklist as a skill</li><li>Meeting-prep and review-deck templates</li><li>Service calendar (RMDs, tax dates, rebalance windows)</li></ul></div>
+      <div><h4>First workflows</h4>
+        <ul><li>Meeting-prep brief: CRM history + holdings + last notes + open tasks</li><li>Post-meeting summary → CRM notes and tasks (advisor approves)</li><li>Client review decks connected to live portfolio data</li><li>Compliance pre-review of outbound content against the Marketing Rule skill</li></ul></div>
+      <div><h4>Guardrails</h4>
+        <ul><li>Books-and-records: observation logs + archived outputs support 17a-4-style retention</li><li>No client-facing advice leaves without advisor sign-off — ever</li><li>PII data-flow policies: sensitive reads block external sends</li><li>Trading and money movement stay entirely outside the OS</li></ul></div>
+    </div>
+    <p class="wallets-note"><b>Wallets angle</b> Internal only: capped Virtual Wallets for research/data API spend per advisor agent. Client funds never touch Wallets — say so explicitly in the compliance memo; it will be their first question.</p>
+  </article>
+
+  <article class="vertical">
+    <h3>Sales &amp; marketing organizations <span class="sub">agencies · B2B sales teams</span></h3>
+    <div class="v-grid">
+      <div><h4>Systems to gatekeep</h4>
+        <ul><li>CRM — HubSpot, Salesforce</li><li>ZoomInfo — a <strong>stock Gatekeeper already exists</strong></li><li>Email &amp; calendar (stock Google Gatekeeper), Slack</li><li>Ad/analytics platforms as read sources</li></ul></div>
+      <div><h4>Knowledge bases</h4>
+        <ul><li>ICP definitions, battlecards, messaging pillars</li><li>Proposal &amp; case-study library</li><li>Brand voice / style guide as a skill</li><li>Pricing &amp; discount policy</li></ul></div>
+      <div><h4>First workflows</h4>
+        <ul><li>Account research briefs + call prep (Cloudflare's own sales org saved 10,000+ hours/month on this class of work)</li><li>Proposal generation from CRM context in house templates</li><li>Lead triage + enrichment → CRM hygiene</li><li>Campaign calendar as a live document; pipeline-review gadget</li></ul></div>
+      <div><h4>Guardrails</h4>
+        <ul><li>Outbound email behind approval until deliverability &amp; tone are proven</li><li>Discount/pricing data scoped by role</li><li>Brand-voice skill applied to all client-facing drafts</li></ul></div>
+    </div>
+    <p class="wallets-note"><b>Wallets angle</b> The strongest near-term buy-side fit: pay-per-call enrichment and intent-data APIs over x402, one capped Virtual Wallet per SDR agent ("$100/week enrichment budget"), allowlisted vendors, finance-owned Account Wallet.</p>
+  </article>
+
+  <article class="vertical">
+    <h3>Physical therapy clinics <span class="sub">and comparable outpatient practices</span></h3>
+    <div class="v-grid">
+      <div><h4>Systems to gatekeep</h4>
+        <ul><li>EMR / practice management — WebPT, Prompt, Jane</li><li>Scheduling; referral fax/e-fax inbox</li><li>Eligibility / clearinghouse portal</li><li>Merchant processor for patient payments (read + refund-with-approval only)</li></ul></div>
+      <div><h4>Knowledge bases</h4>
+        <ul><li>Documentation standards &amp; payer-specific rules</li><li>Home-exercise-program (HEP) content library</li><li>Front-desk scripts and policies</li><li>Denial/appeal letter templates</li></ul></div>
+      <div><h4>First workflows</h4>
+        <ul><li>Referral intake → chart prep + benefits-check worksheet</li><li>Plan-of-care and progress-note first drafts — <strong>therapist reviews and signs everything</strong></li><li>No-show/waitlist backfill workflow; recall reminders</li><li>Denial triage and appeal-letter drafts</li></ul></div>
+      <div><h4>Guardrails</h4>
+        <ul><li>HIPAA: BAAs with Cloudflare (enterprise) <em>and</em> model providers via AI Gateway (zero-retention endpoints); confirm before any PHI flows</li><li>Minimum necessary = Gatekeeper scoping per role</li><li>Data-flow policy: PHI reads block sends to any non-BAA destination</li><li>Observation logs as the HIPAA audit trail</li></ul></div>
+    </div>
+    <p class="wallets-note"><b>Wallets angle</b> Narrow: per-transaction eligibility-check APIs on a capped Virtual Wallet. Patient billing stays in the merchant processor — Wallets is not a payments rail for patients.</p>
+  </article>
+
+  <article class="vertical">
+    <h3>The cross-cutting stack <span class="sub">nearly every client gets these three custom Gatekeepers</span></h3>
+    <div class="v-grid">
+      <div><h4>QuickBooks Online</h4>
+        <ul><li>AR aging digest + draft collection emails (approval to send)</li><li>Invoice drafts from CRM/won-deal data</li><li>Expense categorization suggestions</li><li>Month-end close checklist as a workflow</li></ul></div>
+      <div><h4>Merchant processing <span style="text-transform:none">(Stripe / Square)</span></h4>
+        <ul><li>Daily revenue &amp; payout reconciliation vs. QBO</li><li>Dispute/chargeback evidence assembly</li><li>Refunds strictly behind human approval</li><li>Failed-payment dunning drafts</li></ul></div>
+      <div><h4>CRM <span style="text-transform:none">(whatever they run)</span></h4>
+        <ul><li>Record hygiene &amp; dedupe suggestions</li><li>Activity capture from email/calendar</li><li>Pipeline and stuck-deal digests</li><li>The context source for almost every other workflow</li></ul></div>
+    </div>
+    <div class="guard-note"><b>Reuse economics</b> Build each of these once as a well-tested internal package, then instantiate per client with client-specific policy. By the third client, integration cost drops sharply while price holds — this is the margin engine of the practice (effort numbers in Section 09).</div>
+  </article>
+</section>
+
+<!-- ============================================================ -->
+<section id="wallets">
+  <div class="sec-head"><span class="sec-num">07</span><h2>The Cloudflare Wallets track</h2></div>
+  <div class="prose">
+    <p>Cloudflare Wallets (announced alongside Agents Week 2026) give agents the ability to pay for things. Two constructs: <strong>Account Wallets</strong> for humans and organizations, and <strong>Virtual Wallets</strong> for agents operating via API key. Payments ride the <strong>x402 protocol</strong> — payment attached directly to an HTTP request, settled in stablecoin micropayments — so an agent can try, compare, and buy API services without a human navigating a checkout page. Guardrails are native: each Virtual Wallet carries an <strong>allowance, an allowlist, and a maximum transaction size</strong>. Identity comes from <code>cloudflare.pay</code> handles (e.g. <code>research.acme.cloudflare.pay</code>) plus Web Bot Auth keypair registration, so merchants can attribute and trust agent traffic. On the sell side, the <strong>Monetization Gateway</strong> lets a business accept headless micropayments for its own APIs and content.</p>
+
+    <h3>Three patterns worth building for clients</h3>
+    <ol>
+      <li><strong>Governed agent spend (buy-side).</strong> Finance owns the Account Wallet; each department or agent gets a Virtual Wallet with a weekly allowance and vendor allowlist — "$100/week of enrichment for the SDR agents," "$50/week of records lookups for intake." Spend is attributed per agent, capped by construction, and reviewable by the same governance council that owns model budgets. This is the natural extension of the AI Gateway budget conversation you're already having in Phase 2.</li>
+      <li><strong>Monetizing the client's data (sell-side).</strong> If the client has data other businesses' agents will want — parts availability, capacity, rate cards, specialized content — the Monetization Gateway turns it into a metered, x402-payable API. For a manufacturer this can be a genuinely new revenue line, and it's a build you deliver as a Worker in the same account.</li>
+      <li><strong>Agent identity for trust (both sides).</strong> Register the client's agents with <code>cloudflare.pay</code> handles and Web Bot Auth so their traffic is attributable — increasingly, this is what keeps a legitimate agent from being treated as a hostile bot by the other side.</li>
+    </ol>
+  </div>
+
+  <div class="callout warn">
+    <h4>When to include the track — and when to refuse it</h4>
+    <ul>
+      <li>Offer it as <strong>Phase 8, post-rollout only</strong>, and only where real metered spend or a real sell-side story exists. Wallets attached to a platform nobody has adopted yet is a distraction.</li>
+      <li>Stablecoin settlement means treasury and accounting sign-off: who funds the Account Wallet, how spend books into QBO, who reviews the allowlist.</li>
+      <li>For financial-services and healthcare clients, get compliance review first. Position is always: <strong>Wallets is for agent-to-service commerce — client funds, patient billing, and card payments stay in existing regulated rails</strong>.</li>
+      <li>The product is brand-new. Claim the client's <code>cloudflare.pay</code> handle early (defensive), pilot with small allowances, and treat everything else as reversible.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="training">
+  <div class="sec-head"><span class="sec-num">08</span><h2>Training, handoff &amp; acceptance</h2></div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Track</th><th>Audience · length</th><th>Covers</th></tr></thead>
+      <tbody>
+        <tr><td>End user</td><td>Everyone · 2 hours</td><td>Workspaces, documents, asking well, the approval queue, what the agent can/can't reach, where the audit trail lives. Taught on <em>their</em> workflows, not demos.</td></tr>
+        <tr><td>Champion</td><td>2–4 per dept · 1 day</td><td>Writing and editing skills files, building gadgets from prompts, sharing apps (build vs. use roles) vs. Blueprints, triaging requests into the skills backlog, running office hours.</td></tr>
+        <tr><td>Administrator</td><td>IT/ops · 2 days</td><td><code>deployment.jsonc</code>, Access policy, AI Gateway model matrix and budgets, daily-allowance tuning, Gatekeeper policy edits and credential rotation, observation-log review, the staging-first upgrade runbook.</td></tr>
+        <tr><td>Builder</td><td>Client devs, if any · 2 days</td><td>Custom Gatekeeper development in <code>packages/custom-gatekeeper</code>, service bindings, integration testing, Workflow authoring.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="check-group" style="max-width: 50rem;">
+    <h4>Handoff acceptance checklist — every item demonstrated, then signed</h4>
+    <ul class="checklist">
+      <li>Client admin performs a staging release upgrade unassisted, then promotes to production</li>
+      <li>Client admin rotates one Gatekeeper credential end-to-end</li>
+      <li>All vendor access revoked: deploy tokens, admin seats, provider keys rotated</li>
+      <li>Every approval queue tested end-to-end to its named approver</li>
+      <li>Observation-log review walkthrough completed with the compliance owner</li>
+      <li>Metrics dashboard live with the agreed KPIs (adoption, hours saved, spend/user, approval latency)</li>
+      <li>Runbooks delivered: admin, upgrade, incident/rollback, credential rotation</li>
+      <li>Deployment config + custom Gatekeeper code in a client-owned repo with CI deploy</li>
+      <li>Governance council chartered; first meeting held on its own agenda</li>
+      <li>Support agreement signed (tier, SLAs, upgrade responsibility)</li>
+    </ul>
+  </div>
+
+  <div class="prose">
+    <p>The 30/60/90 plan hands the council targets: <strong>30 days</strong> — every rolled-out department ≥60% weekly active; <strong>60 days</strong> — first client-built skill and first client-built Blueprint shipped without you; <strong>90 days</strong> — second release upgrade performed unassisted, or delegated back to you under the managed-service retainer (which is the renewal conversation).</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="commercials">
+  <div class="sec-head"><span class="sec-num">09</span><h2>Costs, effort &amp; pricing</h2></div>
+  <div class="prose">
+    <h3>What the client pays to run it</h3>
+    <p>The platform bill is small; the model bill is the real line item, and it's governable. Client-side monthly run-rate, order-of-magnitude:</p>
+  </div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Line</th><th>Order of magnitude</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Workers Paid + DO/KV/R2</td><td class="num">$5 base + low single digits per active user</td><td>Isolate-based compute is cheap at office-work volumes</td></tr>
+        <tr><td>Cloudflare Access</td><td class="num">Free ≤50 users, then per-seat</td><td>Zero Trust free tier covers most small clients — verify current plan terms</td></tr>
+        <tr><td>Model spend via AI Gateway</td><td class="num">$10–75 / active user / month</td><td>Dominated by model matrix choices; throttled by <code>DAILY_LLM_CALL_LIMIT</code> (default 100 calls/day) and per-team budgets</td></tr>
+        <tr><td>AI Search / vectorize / misc</td><td class="num">Low tens per month</td><td>Scales with corpus size</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose"><h3>Your effort per integration — plan and price with these</h3></div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Integration class</th><th>First build</th><th>Re-instantiation</th><th>Examples</th></tr></thead>
+      <tbody>
+        <tr><td>Stock Gatekeeper config</td><td class="num">0.5–1 day</td><td class="num">0.5 day</td><td>Google, Slack, Notion, Confluence, ZoomInfo</td></tr>
+        <tr><td>OAuth SaaS REST</td><td class="num">3–7 days</td><td class="num">1–2 days</td><td>QuickBooks Online, HubSpot, Stripe, Clio, Wealthbox</td></tr>
+        <tr><td>Microsoft Graph</td><td class="num">5–10 days</td><td class="num">2–3 days</td><td>M365 mail, calendar, SharePoint</td></tr>
+        <tr><td>Vertical SaaS, decent API</td><td class="num">1–3 weeks</td><td class="num">3–5 days</td><td>WebPT/Jane, Orion, NetDocuments</td></tr>
+        <tr><td>On-prem / ERP via Mesh</td><td class="num">3–6 weeks</td><td class="num">1–2 weeks</td><td>Epicor, SAP B1, MES read-only feeds</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose"><h3>Offer structure and pricing bands</h3><p>Bands assume US SMB/mid-market; calibrate to your market and cost base. Fixed-fee the sprint, milestone the build, subscribe the rest.</p></div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Offer</th><th>Contents</th><th>Duration</th><th>Band</th></tr></thead>
+      <tbody>
+        <tr><td>Discovery Sprint</td><td>Phases 0–1: magic inbox, use-case register, integration map, policy matrix, pilot charter. Sold standalone — de-risks the build for both sides and is a deliverable even if they stop there.</td><td class="num">3 wks</td><td class="num">$9k–$25k fixed</td></tr>
+        <tr><td>Foundation &amp; Pilot</td><td>Phases 2–5: deployed platform (prod + staging), integration waves 1–2, Codex v1 + skills, measured pilot with go/no-go report.</td><td class="num">8 wks</td><td class="num">$35k–$90k milestone</td></tr>
+        <tr><td>Rollout &amp; Handoff</td><td>Phases 6–7: department waves, full training curriculum, runbooks, acceptance checklist, governance charter, 30/60/90.</td><td class="num">4–5 wks</td><td class="num">$15k–$45k</td></tr>
+        <tr><td>Managed Service</td><td>Monthly: release upgrades, Gatekeeper maintenance, new skills/workflows from the backlog, governance-council seat, spend review. The recurring-revenue core.</td><td class="num">ongoing</td><td class="num">$2.5k–$12k/mo tiered</td></tr>
+        <tr><td>Additional Gatekeeper</td><td>Scoped per the effort table above, with policy, tests, and docs.</td><td class="num">per item</td><td class="num">$6k–$50k by class</td></tr>
+        <tr><td>Wallets Add-on</td><td>Phase 8: Account/Virtual Wallet governance, x402 buy-side integration, Monetization Gateway build, treasury runbook.</td><td class="num">2–4 wks</td><td class="num">$8k–$25k</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout go">
+    <h4>The margin logic, stated once</h4>
+    <p>Revenue concentrates in discovery, knowledge curation, and training — work that is client-specific by nature. Cost concentrates in Gatekeepers — work that is <em>reusable</em> by nature. Every engagement should leave the practice library one Gatekeeper or one vertical kit richer, so the third client in a vertical costs roughly half the first at the same price.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="faq">
+  <div class="sec-head"><span class="sec-num">10</span><h2>IT &amp; security FAQ — objection handling</h2></div>
+  <div class="faq">
+    <div class="faq-item"><h4>Where does our data live?</h4>
+      <p>In your own Cloudflare account — R2, KV, and Durable Objects you own. We hold no tenancy, no copy, and at handoff no access. Observation logs, documents, and app state are yours.</p></div>
+    <div class="faq-item"><h4>Who can see our system credentials?</h4>
+      <p>Only the Gatekeeper Workers. Credentials never reach agent code, model providers, or shared artifacts. At handoff, every credential we touched is rotated as part of the signed acceptance checklist.</p></div>
+    <div class="faq-item"><h4>Do AI providers train on our data?</h4>
+      <p>All model traffic routes through your AI Gateway to the endpoints we configure — enterprise/no-training terms, selected per your policy. The model matrix is yours to change at any time without redeployment.</p></div>
+    <div class="faq-item"><h4>What stops an agent from doing something it shouldn't?</h4>
+      <p>Agents start with access to nothing; every capability is an explicit grant through a Gatekeeper that scopes resources, logs every read, and queues side effects (sends, payments, filings) behind named human approvers. App servers run with outbound networking disabled.</p></div>
+    <div class="faq-item"><h4>Can an employee leak data by sharing a workspace or app?</h4>
+      <p>The platform records every resource an agent observed; when someone opens shared work, Gatekeepers verify <em>that person's</em> access to each observed resource first. Collaborators use their own model budgets and their own third-party connections. Share links are stored hashed and are revocable, with live sessions cut on revocation.</p></div>
+    <div class="faq-item"><h4>What's the license, and what do we own?</h4>
+      <p>Cloudflare OS is Apache-2.0 — permissive open source. Your deployment config, Codex, skills, and policy are yours outright; custom Gatekeeper code ownership is set in the SOW (default: perpetual license to you, reusable core retained by us).</p></div>
+    <div class="faq-item"><h4>What if Cloudflare abandons the project?</h4>
+      <p>The pinned release keeps running regardless — nothing phones home. The runtime (<code>workerd</code>) is open source, and the platform can be self-hosted on it. Your exit path exists on day one.</p></div>
+    <div class="faq-item"><h4>Is this HIPAA / SEC ready?</h4>
+      <p>The architecture supports it — scoped access, audit logs, approval gates, retention export — but paperwork must precede PHI/PII: BAA or DPA with Cloudflare and with each model provider, verified per current terms during Phase 0. Your professionals remain accountable for outputs; the platform makes that accountability auditable.</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="risks">
+  <div class="sec-head"><span class="sec-num">11</span><h2>Risks &amp; honest caveats</h2></div>
+  <div class="prose">
+    <ul>
+      <li><strong>Upstream churn.</strong> Early access, heavy development, small-PRs-only. Mitigate: pinned releases, a standing staging deployment, monthly tested upgrades, never promising features off the roadmap (managed dashboard, containers, Slack embedding).</li>
+      <li><strong>You own the Gatekeeper long tail.</strong> Stock coverage is thin outside the Google/Slack/Notion core; every CRM/QBO/EMR/ERP connection is code you build and maintain. That's the business — but price maintenance into the retainer, and reuse ruthlessly across clients.</li>
+      <li><strong>Model spend drift.</strong> Unbudgeted frontier-model usage is the classic blowup. AI Gateway budgets, the per-user daily allowance, per-tier model matrices, and monthly governance review are the standing defense.</li>
+      <li><strong>Compliance is shared, not transferred.</strong> BAAs, retention, and marketing-rule review make the deployment <em>defensible</em>; the client's professionals remain accountable for outputs. Put "humans retain accountability" (Cloudflare's own principle) in the governance charter verbatim.</li>
+      <li><strong>Approval-queue fatigue.</strong> If everything needs sign-off, value dies in the queue; if nothing does, trust dies on the first bad send. Tune per workflow during the pilot, and monitor approval latency as a first-class metric.</li>
+      <li><strong>Credential-gathering drag.</strong> The most common schedule slip is waiting on client OAuth apps and API keys — issue the Section 05 checklist at Phase 0 and review it weekly with the sponsor.</li>
+      <li><strong>Exit path.</strong> Apache-2.0 core on open-source <code>workerd</code>, self-hostable. Document this in every proposal — it converts the lock-in objection into a strength.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="factory">
+  <div class="sec-head"><span class="sec-num">12</span><h2>The delivery factory — running the whole pipeline on your own OS</h2></div>
+  <div class="prose">
+    <p>The end state: your firm runs its own Cloudflare OS deployment, the Studio lives inside it as a <strong>gadget</strong>, and an event-driven pipeline carries a lead from website form to deployed client instance — agents doing the knowledge work, humans approving the side effects. Marketing automation stays in GoHighLevel (it's built for that); your OS takes over from the moment money changes hands. Each client still gets their <em>own</em> Cloudflare OS instance in their <em>own</em> account — your deployment is the factory, never the host.</p>
+  </div>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  W[Website form] --> GHL[GoHighLevel CRM<br/>nurture · booking · payments]
+  GHL -- Buy Now:<br/>Discovery Sprint --> PAY[Payment webhook]
+  PAY --> WF[OS kickoff Workflow<br/>Studio record · booking link]
+  WF --> DISC[Discovery<br/>Studio gadget + agent synthesis]
+  DISC --> DES[Design &amp; scope<br/>generated + agent-polished]
+  DES --> PROP[Proposal deck + agreement<br/>Slides · e-sign]
+  PROP -- signed<br/>webhook --> BUILD[Build workflows<br/>scaffold · provision via<br/>Cloudflare API gatekeeper]
+  BUILD --> LIVE[Client's own<br/>Cloudflare OS]
+  LIVE --> HO[Training · handoff<br/>managed service]
+    </pre>
+  </div>
+
+  <div class="prose"><h3>Stage by stage — what runs, and where the humans are</h3></div>
+  <div class="tbl-scroll wide">
+    <table>
+      <thead><tr><th>Stage</th><th>Trigger</th><th>What runs</th><th>Human gate</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Lead capture</td><td>Website form</td><td>GoHighLevel automations: tagging, nurture sequence, booking links. Don't rebuild GHL inside the OS — an agent can <em>draft</em> the high-touch personalized emails via the GHL gatekeeper, queued for approval.</td><td>Outbound sends approved until tone/deliverability is proven</td></tr>
+        <tr><td>2 · Sale</td><td>"Buy Now" click</td><td>The buy-now product is the <strong>fixed-price Discovery Sprint</strong> (Section 09) — nobody impulse-buys a five-figure build, but a productized sprint sells from a page. GHL payments/Stripe processes it.</td><td>—</td></tr>
+        <tr><td>3 · Kickoff</td><td>Payment webhook → GHL gatekeeper</td><td>OS Workflow: creates the Studio engagement record, sends the discovery booking link (GHL calendar), opens the client-prerequisites checklist (Section 05), notifies the engagement lead.</td><td>—</td></tr>
+        <tr><td>4 · Discovery</td><td>Meeting held</td><td>Transcript + notes land in the Studio gadget; agents cluster magic-inbox items and synthesize the use-case register natively (no copy-paste seam — agents read gadget state directly).</td><td><strong>A human runs the discovery conversation</strong> — interview quality is the product</td></tr>
+        <tr><td>5 · Design</td><td>Studio record complete</td><td>The Studio's generator produces pilot charter, integration map, policy matrix, timeline; an agent polishes it into a client-branded <strong>Slides deck</strong> (native OS output) plus the scope doc.</td><td>Engagement lead reviews before anything is sent</td></tr>
+        <tr><td>6 · Approval</td><td>Deck + agreement sent</td><td>E-signature via GHL Documents (or a PandaDoc/DocuSign gatekeeper). The signed webhook is the pipeline's green light.</td><td><strong>Client signs</strong>; you countersign</td></tr>
+        <tr><td>7 · Build</td><td>Signed webhook</td><td>Agent scaffolds the starter repo from the Studio record's JSON (deployment.jsonc filled, gatekeeper packages stubbed, skills seeded). Provisioning runs through the <strong>Cloudflare API gatekeeper</strong> holding a <em>client-issued, scoped</em> token — every resource creation and deploy lands in your approval queue first.</td><td><strong>Client-held credentials, OAuth consents, IdP setup, BAAs</strong> — inherently human; plus deploy approvals</td></tr>
+        <tr><td>8 · Handoff</td><td>Acceptance checklist (Section 08)</td><td>Agents draft training materials and runbooks from the engagement record; workflows schedule the 30/60/90 check-ins and the monthly release-bump reminder.</td><td>Humans train, demonstrate, and sign acceptance</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <h4>Why the four gates are features, not compromises</h4>
+    <p>Outreach approval, the discovery conversation, the signature, and client-held consents are exactly the "agents do the work, humans approve the side effects" model you sell. Running your own funnel this way makes your firm the first reference customer: every sales demo becomes <em>"this pipeline you just went through — agents ran it, we approved it, and that's what we're building for you."</em> Full autonomy here is neither achievable (the client must grant credentials and sign) nor desirable (an unapproved agent email to a prospect is how you lose one).</p>
+  </div>
+
+  <div class="prose"><h3>What has to be built, in order</h3></div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Component</th><th>What it is</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td>Your own OS deployment</td><td>Section 03's showroom — the factory floor everything else lives on</td><td class="num">2–4 days</td></tr>
+        <tr><td>GoHighLevel gatekeeper</td><td>Custom: contacts/opportunities read, email drafts behind approval, calendar links, payment + signed-document webhooks in</td><td class="num">1–2 weeks</td></tr>
+        <tr><td>Studio gadget port</td><td>The web app's data model into a gadget (Durable Object SQLite, multi-user, agent-readable); schema is transplant-ready</td><td class="num">2–3 weeks</td></tr>
+        <tr><td>Pipeline workflows</td><td>Kickoff, design-ready, signed-→-build, handoff cadence — deterministic Workflows with agent steps only where judgment adds value</td><td class="num">1–2 weeks</td></tr>
+        <tr><td>Proposal deck template</td><td>Client-branded Slides template the design stage fills; the presentation-worthy artifact</td><td class="num">3–5 days</td></tr>
+        <tr><td>Provisioning path</td><td>Cloudflare API gatekeeper config for client-scoped tokens + the JSON→scaffold codegen script in the practice repo</td><td class="num">1–2 weeks</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <h4>Sequencing — don't build the factory before the first car</h4>
+    <p>Run clients 1–2 with the standalone Studio and manual pipeline (Sections 04–05). Real engagements will stress-test the data model and the catalogs; port the gadget and wire the pipeline when the schema has stopped moving. Realistic factory build: <strong>4–8 weeks</strong> of part-time effort once your own OS is up — and the gadget port is a fitting first job for an agent <em>inside</em> that OS, with your engineer approving.</p>
+  </div>
+</section>
+
+<footer>
+  <p><strong>Sources</strong> — reviewed August 5, 2026:</p>
+  <ul>
+    <li><a href="https://github.com/cloudflare/cloudflare-os">cloudflare/cloudflare-os</a> — core repository (Apache-2.0), README, and <code>docs/</code> (oauth-signin, ai-gateway-billing, public-server, sharing, blueprints, observers, integration-testing)</li>
+    <li><a href="https://github.com/cloudflare/cloudflare-os-starter">cloudflare/cloudflare-os-starter</a> — pinned-release deployment wrapper (<code>deployment.jsonc</code>, custom Gatekeepers, <code>/admin</code> branding)</li>
+    <li><a href="https://blog.cloudflare.com/cloudflare-os/">Cloudflare OS: an open platform for agents, apps, and work</a> — announcement</li>
+    <li><a href="https://blog.cloudflare.com/how-we-use-ai-with-cloudflare-os/">How we're rethinking work at Cloudflare with Cloudflare OS</a> — internal usage &amp; rollout lessons</li>
+    <li><a href="https://blog.cloudflare.com/wallets/">Cloudflare Wallets</a> — Account/Virtual Wallets, x402, cloudflare.pay, Monetization Gateway</li>
+    <li><a href="https://blog.cloudflare.com/agents-week-in-review/">Agents Week 2026 in review</a> — Mesh, Managed OAuth, AI Search, Email Service, and related launches</li>
+  </ul>
+  <p>Prepared as an internal practice playbook. Pricing bands are placeholders to calibrate; verify HIPAA BAA availability, model-provider terms, Access plan limits, and Wallets eligibility per client before committing scope. <a class="backtop" href="#top">Back to top ↑</a></p>
+</footer>
+
+</div>
