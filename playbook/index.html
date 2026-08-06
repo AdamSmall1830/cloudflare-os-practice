@@ -309,7 +309,7 @@
     <p>Agents and apps start with <strong>zero access</strong>; capabilities are granted explicitly and credentials never touch agent code. The platform <strong>records every resource an agent observes</strong>, and those observations travel with the work — when someone opens a shared workspace or document, Gatekeepers verify <em>that person's</em> access to every observed resource before showing it. Server code runs with outbound networking disabled; sensitive reads can taint a session and restrict what the agent may do next (no external sends, no new collaborators). Side effects — merging a PR, sending an email, issuing a refund — can be queued behind human approval, and agents keep working on a simulated outcome while approval is pending. Share links are stored as HMAC hashes and revocable, with sessions force-restarted when access changes. For regulated clients, the observation log is the audit trail.</p>
 
     <h3>What ships today</h3>
-    <p>The core repo (<code>cloudflare/cloudflare-os</code>), a hosted deploy flow at <code>os.cloudflare.app/deploy</code>, and a starter deployment repo (<code>cloudflare/cloudflare-os-starter</code>) that wraps a <strong>pinned release</strong> with your branding, sign-in, routes, custom Gatekeepers, and upgrade control — customization without patching upstream. Stock Gatekeepers exist for <strong>GitHub, Google APIs, Slack, Notion, Confluence, Supabase, Email Workers, the Cloudflare API, Home Assistant, Spotify, and ZoomInfo</strong>. Everything else a client needs — CRM, QuickBooks Online, merchant processor, EMR, ERP, Microsoft 365 — is a custom Gatekeeper you build. That gap is the core of the services business.</p>
+    <p>The core repo (<code>cloudflare/cloudflare-os</code>), a hosted deploy flow at <code>os.cloudflare.app/deploy</code>, and a starter deployment repo (<code>cloudflare/cloudflare-os-starter</code>) that wraps a <strong>pinned release</strong> with your branding, sign-in, routes, custom Gatekeepers, and upgrade control — customization without patching upstream. Stock Gatekeepers exist for <strong>GitHub, Google APIs, Slack, Notion, Confluence, Supabase, Email Workers, the Cloudflare API, Home Assistant, Spotify, and ZoomInfo</strong>. The platform also connects to <strong>existing MCP servers</strong> your client's vendors already publish, governed through <strong>MCP Server Portals</strong> (Cloudflare One) — see the decision tree in Section 02. Everything not covered by either — much of the CRM/QBO/EMR/ERP long tail — is a custom Gatekeeper you build. That build-vs-connect gap is the core of the services business.</p>
   </div>
 
   <div class="callout warn">
@@ -357,6 +357,7 @@ flowchart LR
         <tr><td>Models</td><td>AI Gateway (<code>CF_AI_GATEWAY</code> vars) + provider keys; Workers AI optional</td><td>Org-funded via the platform gateway; throttle with the per-user daily allowance (<code>DAILY_LLM_CALL_LIMIT</code>, default 100 calls/day)</td></tr>
         <tr><td>Core OS</td><td>Pinned <code>cloudflare-os</code> release via <code>cloudflare-os-starter</code></td><td>Branding via <code>/admin</code> (no redeploy); infra changes via <code>deployment.jsonc</code> (redeploy). Starter requires Node 24 + pnpm 11</td></tr>
         <tr><td>Integrations</td><td>Stock Gatekeepers + custom Gatekeepers in <code>packages/custom-gatekeeper</code></td><td>Each custom Gatekeeper is its own Worker with service bindings — separately deployable and testable</td></tr>
+        <tr><td>MCP integrations</td><td>Vendor remote MCP servers via <strong>MCP Server Portals</strong> (Cloudflare One AI controls)</td><td>Config-first path when the vendor already publishes an MCP server: SSO-gated, per-tool scoped, logged — no code to maintain</td></tr>
         <tr><td>Knowledge</td><td>R2 + AI Search (hybrid retrieval), Notion/Confluence Gatekeepers, skills library</td><td>Skills files are versioned like code — treat them as the client's process IP</td></tr>
         <tr><td>Private reach</td><td>Cloudflare Mesh / Tunnel for on-prem systems</td><td>How agents reach an ERP, MES, or DMS that never touches the public internet</td></tr>
         <tr><td>Ops</td><td>Error-reporting Worker, logs/traces per observability guide</td><td>Ships in the starter; wire to the client's log destination</td></tr>
@@ -367,6 +368,17 @@ flowchart LR
   <div class="callout">
     <h4>Build order for integrations — cheapest trust first</h4>
     <p>Stock Gatekeepers (Google email/calendar, Slack, Notion/Confluence) land in days and produce visible wins immediately. Custom Gatekeepers follow in value order: <strong>CRM → QuickBooks Online → merchant processor → line-of-business system</strong>. Start every Gatekeeper read-only; add writes behind approval queues only after the pilot proves the read path.</p>
+  </div>
+
+  <div class="callout go">
+    <h4>Gatekeeper vs. MCP server — always check the cheapest governed path first</h4>
+    <p>MCP v2 (spec 2026-07-28) made MCP servers stateless plain-HTTP workloads — they run as ordinary Workers, and vendors are shipping official remote servers fast (Cloudflare alone publishes 13). Cloudflare OS supports both integration paths natively. The decision tree, per system:</p>
+    <ol>
+      <li><strong>Stock Gatekeeper exists</strong> → use it (config, ~half a day).</li>
+      <li><strong>Vendor publishes a remote MCP server</strong> → connect it through an <strong>MCP Server Portal</strong> (Cloudflare One AI controls): SSO-gated, per-tool scoped, logged — configuration instead of code, and the vendor maintains the integration.</li>
+      <li><strong>Neither</strong> → custom Gatekeeper from the practice library.</li>
+    </ol>
+    <p>Where custom Gatekeepers still win even when an MCP server exists: your own approval-queue semantics on side-effectful tools, tight typed scoping (per-matter, per-realm, minimum-necessary PHI), on-prem reach via Tunnel, and policy that belongs to <em>you</em> rather than the vendor's tool surface. Rule of thumb: <strong>MCP for reads and vendor-maintained breadth; Gatekeepers for writes, walls, and anything the client must be able to audit on their own terms.</strong> Price portal connections like stock-gatekeeper config, not like builds.</p>
   </div>
 </section>
 
@@ -715,7 +727,7 @@ flowchart LR
     <h3>Three patterns worth building for clients</h3>
     <ol>
       <li><strong>Governed agent spend (buy-side).</strong> Finance owns the Account Wallet; each department or agent gets a Virtual Wallet with a weekly allowance and vendor allowlist — "$100/week of enrichment for the SDR agents," "$50/week of records lookups for intake." Spend is attributed per agent, capped by construction, and reviewable by the same governance council that owns model budgets. This is the natural extension of the AI Gateway budget conversation you're already having in Phase 2.</li>
-      <li><strong>Monetizing the client's data (sell-side).</strong> If the client has data other businesses' agents will want — parts availability, capacity, rate cards, specialized content — the Monetization Gateway turns it into a metered, x402-payable API. For a manufacturer this can be a genuinely new revenue line, and it's a build you deliver as a Worker in the same account.</li>
+      <li><strong>Monetizing the client's data (sell-side).</strong> If the client has data other businesses' agents will want — parts availability, capacity, rate cards, specialized content — the Monetization Gateway turns it into a metered, x402-payable API. For a manufacturer this can be a genuinely new revenue line, and it's a build you deliver as a Worker in the same account. Under MCP v2 the natural shape is an <strong>MCP server whose tools are x402-priced</strong> — other businesses' agents discover, call, and pay through one protocol stack.</li>
       <li><strong>Agent identity for trust (both sides).</strong> Register the client's agents with <code>cloudflare.pay</code> handles and Web Bot Auth so their traffic is attributable — increasingly, this is what keeps a legitimate agent from being treated as a hostile bot by the other side.</li>
     </ol>
   </div>

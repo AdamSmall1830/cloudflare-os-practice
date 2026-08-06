@@ -15,6 +15,7 @@ describe("buildSteps", () => {
       "deploy",
       "gateway",
       "brand",
+      "mcpcheck",
       "sys-google",
       "sys-cfapi",
       "sys-qbo",
@@ -61,7 +62,7 @@ describe("buildGuideMarkdown", () => {
   it("renders every step with numbering and acceptance checks", () => {
     const md = buildGuideMarkdown(hqClient());
     expect(md).toContain("## 1. Prepare your machine");
-    expect(md).toContain("## 16. Pilot readiness — final gate");
-    expect(md.match(/> \*\*You know it worked when:\*\*/g)).toHaveLength(16);
+    expect(md).toContain("## 17. Pilot readiness — final gate");
+    expect(md.match(/> \*\*You know it worked when:\*\*/g)).toHaveLength(17);
   });
 });

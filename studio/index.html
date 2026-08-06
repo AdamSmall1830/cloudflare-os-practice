@@ -1003,6 +1003,16 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
     </ol>`,
     verify:`A non-admin pilot user sees the client's name and logo on sign-in.` });
 
+  steps.push({ id:"mcpcheck", title:"Check for vendor MCP servers before building custom",
+    body:`<p>Cloudflare OS connects to external systems two ways: its own Gatekeepers, and <strong>existing MCP servers</strong> governed through <strong>MCP Server Portals</strong> (Cloudflare One AI controls). MCP v2 made servers stateless HTTP workloads, and vendors are shipping official remote servers fast — so before each custom build below:</p>
+    <ol>
+      <li>Check whether the vendor publishes an official remote MCP server (their developer docs, or the MCP registries).</li>
+      <li>If yes: Zero Trust dashboard → <strong>AI controls → MCP servers</strong> → add the server URL and its auth, group servers into a <strong>Portal</strong>, and scope which tools each user group may call. Configuration, not code — the vendor maintains the integration.</li>
+      <li>Prefer a custom Gatekeeper anyway when you need your own approval-queue semantics on side effects, tight typed scoping (per-matter, per-realm, minimum-necessary PHI), or on-prem reach via Tunnel.</li>
+    </ol>
+    <div class="note"><b>Rule of thumb:</b> MCP for reads and vendor-maintained breadth; Gatekeepers for writes, walls, and client-owned audit policy. Price portal connections like stock-gatekeeper config, not like builds.</div>`,
+    verify:`For each system below you can say which path it uses and why; portal-connected tools appear for a pilot user, disallowed tools are absent, and calls show in the portal's logs.` });
+
   const sysSteps = {
     google: { t:"Connect Google Workspace (stock gatekeeper)", b:`<ol>
       <li>In <code>console.cloud.google.com</code> (same project as sign-in if you made one): enable the Gmail, Calendar, and Drive APIs.</li>

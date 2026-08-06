@@ -153,6 +153,17 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
     verify: "A non-admin pilot user sees the client's name and logo on sign-in.",
   });
 
+  steps.push({
+    id: "mcpcheck",
+    title: "Check for vendor MCP servers before building custom",
+    body: `Cloudflare OS connects to external systems two ways: its own Gatekeepers, and **existing MCP servers** governed through **MCP Server Portals** (Cloudflare One AI controls). MCP v2 (spec 2026-07-28) made servers stateless HTTP workloads, and vendors are shipping official remote servers fast — so before each custom build below:
+1. Check whether the vendor publishes an official remote MCP server (their developer docs, or the MCP server registries).
+2. If yes: Zero Trust dashboard → **AI controls → MCP servers** → add the vendor's server URL and its auth, group servers into a **Portal**, and scope which tools each user group may call. Configuration, not code — and the vendor maintains the integration.
+3. Prefer a custom Gatekeeper anyway when you need: your own approval-queue semantics on side-effectful tools, tight typed scoping (per-matter, per-realm, minimum-necessary PHI), or on-prem reach via Tunnel. Rule of thumb: **MCP for reads and vendor-maintained breadth; Gatekeepers for writes, walls, and client-owned audit policy.**`,
+    verify:
+      "For each system below you can say which path it uses and why; any portal-connected tools appear for a pilot user, disallowed tools are absent, and calls show up in the portal's logs.",
+  });
+
   const sysSteps = systemSteps(c, host);
   for (const s of SYSTEMS.filter((s) => c.systems.includes(s.id)).sort((a, b) => a.wave - b.wave)) {
     const d = sysSteps[s.id];
