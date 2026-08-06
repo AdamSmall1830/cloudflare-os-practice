@@ -2,6 +2,17 @@
 
 The delivery toolkit for our Cloudflare OS implementation business: taking client companies from discovery through design to a deployed, governed AI agent workspace ([Cloudflare OS](https://github.com/cloudflare/cloudflare-os)) in their own Cloudflare account.
 
+## Documentation
+
+| Read this | If you want to |
+|---|---|
+| [docs/getting-started.md](docs/getting-started.md) | Set up — as an **operator** (run engagements in the Studio), a **developer** (build with the engine/CLI), or a **deployer** (host the Studio + AI endpoint) |
+| [docs/studio-guide.md](docs/studio-guide.md) | Learn the Studio's UI/UX — every tab, field, scoring rule, AI-assist mode, and data-handling behavior |
+| [playbook/index.html](playbook/index.html) | The delivery method itself — the 12-section field manual (open in a browser) |
+| [packages/core/README.md](packages/core/README.md) | The engine's API, invariants, and its relationship to the Studio |
+| [packages/scaffold/README.md](packages/scaffold/README.md) | The `cfos-scaffold` CLI — input format and generated files |
+| [workers/ai-proxy/README.md](workers/ai-proxy/README.md) | Deploying the AI endpoint securely |
+
 ## Architecture
 
 ```
