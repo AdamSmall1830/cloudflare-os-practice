@@ -30,7 +30,7 @@ export function buildSteps(c: ClientRecord): BuildStep[] {
   steps.push({
     id: "prereq",
     title: "Prepare your machine",
-    body: "Everything installs on your Mac (or the client's designated deploy machine). One block, run in Terminal:",
+    body: "Everything installs on your Mac (or the client's designated deploy machine). This machine is only the **deploy workstation** — Cloudflare OS itself runs entirely on Cloudflare's network, so nothing here needs to stay online after a deploy. One block, run in Terminal:",
     code: `# Node 24 via nvm, pnpm 11, and Cloudflare's CLI
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 # close & reopen the terminal, then:
