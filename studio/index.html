@@ -1,4 +1,6 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Cloudflare OS Studio</title>
 <style>
   :root {
@@ -23,41 +25,60 @@
     --moss:#3E7A4E; --moss-soft:#E7F0E9; --warn:#9A6B12; --warn-soft:#F7EEDB; }
 
   * { box-sizing:border-box; }
+  :root { color-scheme: light dark; }
   body { background:var(--paper); color:var(--ink); font-family:var(--body); margin:0; font-size:15px; line-height:1.55; }
   .app { max-width:74rem; margin:0 auto; padding:0 1rem 5rem; }
 
   /* Header */
   .hdr { display:flex; flex-wrap:wrap; gap:0.8rem 1.4rem; align-items:center; padding:1.1rem 0 0.9rem; border-bottom:3px solid var(--ink); }
-  .brand { font-family:var(--display); font-size:1.15rem; letter-spacing:0.04em; }
+  .brand { font-family:var(--display); font-size:1.15rem; letter-spacing:0.04em; display:flex; align-items:center; gap:0.6rem; }
+  .brand svg { width:1.7rem; height:1.7rem; color:var(--ember); flex:none; }
   .brand .dot { color:var(--ember); }
   .brand small { display:block; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.16em; color:var(--ink-soft); }
+  @media (max-width: 720px) {
+    .hdr { gap:0.6rem; }
+    .brand { flex:1 1 100%; }
+    #clientSel { flex:1 1 100%; }
+    .hdr .spacer { display:none; }
+    .hdr > button { flex:1 1 auto; padding:0.5rem 0.4rem; font-size:0.66rem; }
+  }
   .hdr .spacer { flex:1; }
   select, input[type=text], input[type=number], input[type=date], textarea {
     font-family:var(--body); font-size:0.9rem; color:var(--ink); background:var(--surface);
-    border:1px solid var(--line); padding:0.45rem 0.6rem; border-radius:4px; max-width:100%;
+    border:1px solid var(--line); padding:0.5rem 0.65rem; border-radius:7px; max-width:100%;
   }
   textarea { width:100%; resize:vertical; }
   input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline:2px solid var(--ember); outline-offset:1px; }
   button { font-family:var(--display); font-size:0.74rem; text-transform:uppercase; letter-spacing:0.1em;
-    background:var(--surface); color:var(--ink); border:1px solid var(--line); padding:0.5rem 0.85rem; border-radius:4px; cursor:pointer; }
-  button:hover { border-color:var(--ember); color:var(--ember); }
+    background:var(--surface); color:var(--ink); border:1px solid var(--line); padding:0.5rem 0.85rem; border-radius:7px; cursor:pointer; }
+  @media (prefers-reduced-motion: no-preference) {
+    button { transition: color 0.15s, border-color 0.15s, background-color 0.15s, box-shadow 0.15s; }
+  }
+  button:hover { border-color:var(--ember); color:var(--ember); background:var(--ember-soft); }
   button.primary { background:var(--ember); border-color:var(--ember); color:var(--paper); }
   button.primary:hover { opacity:0.9; color:var(--paper); }
   button.ghost { border:none; background:none; padding:0.3rem 0.4rem; }
   button.danger:hover { border-color:#B3391B; color:#B3391B; }
 
-  /* Phase tabs */
-  .tabs { display:flex; gap:0; margin:1.1rem 0 1.4rem; border:1px solid var(--line); background:var(--surface); overflow-x:auto; }
-  .tabs button { flex:1; border:none; border-right:1px solid var(--line); border-radius:0; padding:0.75rem 0.9rem; white-space:nowrap; }
-  .tabs button:last-child { border-right:none; }
-  .tabs button .n { color:var(--ember); margin-right:0.45rem; }
+  /* Phase tabs — segmented control with live status badges */
+  .tabs { display:flex; gap:0.3rem; margin:1.1rem 0 1.4rem; border:1px solid var(--line); background:var(--surface); overflow-x:auto;
+    border-radius:12px; padding:0.3rem; box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+  .tabs button { flex:1; border:none; border-radius:9px; padding:0.7rem 0.9rem; white-space:nowrap;
+    display:flex; align-items:center; justify-content:center; gap:0.45rem; }
+  .tabs button:hover { background:var(--ember-soft); }
+  .tabs button .n { color:var(--ember); }
   .tabs button.active { background:var(--ember); color:var(--paper); }
   .tabs button.active .n { color:var(--paper); }
+  .tab-badge { font-family:var(--mono); font-size:0.62rem; font-variant-numeric:tabular-nums; letter-spacing:0;
+    background:var(--paper); border:1px solid var(--line); border-radius:99px; padding:0.05rem 0.5rem; color:var(--ink-soft); }
+  .tabs button.active .tab-badge { background:rgba(0,0,0,0.18); border-color:transparent; color:var(--paper); }
+  .tab-badge:empty { display:none; }
 
   h2 { font-family:var(--display); font-size:1.2rem; letter-spacing:0.02em; margin:1.6rem 0 0.3rem; }
   h2 + .hint { margin-top:0; }
   .hint { color:var(--ink-soft); font-size:0.88rem; margin:0.1rem 0 0.9rem; max-width:56rem; }
-  .card { background:var(--surface); border:1px solid var(--line); padding:1.1rem 1.2rem; margin:0 0 1.1rem; }
+  .card { background:var(--surface); border:1px solid var(--line); padding:1.15rem 1.25rem; margin:0 0 1.2rem;
+    border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,0.05), 0 8px 24px -18px rgba(0,0,0,0.25); }
   .card h3 { font-family:var(--display); font-size:0.95rem; margin:0 0 0.7rem; letter-spacing:0.03em; }
   .card h3 .tag { font-family:var(--mono); font-size:0.66rem; color:var(--ink-soft); font-weight:400; margin-left:0.5rem; }
   .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr)); gap:0.7rem 1.1rem; }
@@ -81,8 +102,28 @@
   td input[type=number] { width:4.2rem; }
   td input[type=text] { min-width:8rem; }
 
-  .empty { color:var(--ink-soft); font-size:0.88rem; padding:0.6rem 0; font-style:italic; }
+  .empty { color:var(--ink-soft); font-size:0.88rem; font-style:italic; padding:0.9rem; border:1px dashed var(--line); border-radius:9px; text-align:center; }
   .row-actions button { font-size:0.62rem; padding:0.25rem 0.5rem; }
+
+  /* Use-case register: stacked cards on phones */
+  @media (max-width: 760px) {
+    #ucTable, #ucTable tbody { display:block; min-width:0; }
+    #ucTable thead { display:none; }
+    #ucTable tr { display:grid; grid-template-columns:repeat(3, 1fr); gap:0.55rem 0.7rem;
+      border:1px solid var(--line); border-radius:10px; padding:0.8rem; margin-bottom:0.8rem; background:var(--surface); }
+    #ucTable td { display:block; border:none; padding:0; white-space:normal; }
+    #ucTable td[data-label]::before { content:attr(data-label); display:block; font-family:var(--display);
+      font-size:0.56rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:0.2rem; }
+    #ucTable td.c-name { grid-column:1 / -1; }
+    #ucTable td.c-dept { grid-column:1 / -1; }
+    #ucTable td input[type=text], #ucTable td input[type=number], #ucTable td select { width:100%; }
+    #ucTable td.c-pilot { text-align:left; }
+    #ucTable td.c-hrs { align-self:end; }
+  }
+
+  /* Phase navigation footer */
+  .phase-nav { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin:1.8rem 0 0.5rem; }
+  .phase-nav button { padding:0.65rem 1.1rem; }
 
   /* Build guide */
   .step { display:grid; grid-template-columns:2.4rem 1fr; gap:0.9rem; padding:1.1rem 0; border-bottom:1px solid var(--line); }
@@ -96,7 +137,7 @@
   .step-body li { margin-bottom:0.25rem; }
   .step-body li::marker { color:var(--ember); }
   .codeblock { position:relative; margin:0.6rem 0 0.8rem; }
-  .codeblock pre { background:#211D18; color:#EFE9E0; font-family:var(--mono); font-size:0.78rem; line-height:1.5; padding:0.85rem 1rem; overflow-x:auto; margin:0; border-radius:4px; }
+  .codeblock pre { background:#211D18; color:#EFE9E0; font-family:var(--mono); font-size:0.78rem; line-height:1.5; padding:0.85rem 1rem; overflow-x:auto; margin:0; border-radius:9px; }
   :root[data-theme="dark"] .codeblock pre { background:#0F0D0B; border:1px solid var(--line); }
   .codeblock .copy { position:absolute; top:0.45rem; right:0.45rem; font-size:0.6rem; padding:0.25rem 0.55rem; background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.3); }
   .codeblock .copy:hover { border-color:#fff; color:#fff; }
@@ -108,7 +149,7 @@
   .inline-input { display:inline-block; }
   .inline-input input { font-family:var(--mono); font-size:0.8rem; }
 
-  .progress { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:0.6rem 0 0.2rem; }
+  .progress { height:8px; background:var(--line); border-radius:99px; overflow:hidden; margin:0.6rem 0 0.2rem; }
   .progress i { display:block; height:100%; background:var(--moss); transition:width 0.25s; }
   @media (prefers-reduced-motion: reduce) { .progress i { transition:none; } }
 
@@ -118,14 +159,14 @@
   button[disabled] { opacity:0.5; cursor:default; }
   .ai-opt { font-family:var(--display); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.13em; color:var(--ember); margin:0.9rem 0 0.35rem; }
   .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:1rem; }
-  .modal { background:var(--surface); border:1px solid var(--line); padding:1.1rem 1.2rem; max-width:38rem; width:100%; }
+  .modal { background:var(--surface); border:1px solid var(--line); padding:1.1rem 1.2rem; max-width:38rem; width:100%; border-radius:12px; }
   .modal h3 { font-family:var(--display); font-size:0.9rem; margin:0 0 0.5rem; }
   .modal textarea { font-family:var(--mono); font-size:0.75rem; }
   .toast { position:fixed; bottom:1.2rem; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--paper); font-family:var(--display); font-size:0.72rem; letter-spacing:0.1em; text-transform:uppercase; padding:0.55rem 1.1rem; border-radius:4px; opacity:0; pointer-events:none; transition:opacity 0.2s; z-index:50; }
   .toast.show { opacity:1; }
   .qa { margin-bottom:0.8rem; }
   .qa .q { font-size:0.85rem; font-weight:600; margin-bottom:0.2rem; }
-  details { border:1px solid var(--line); background:var(--surface); margin-bottom:0.7rem; }
+  details { border:1px solid var(--line); background:var(--surface); margin-bottom:0.7rem; border-radius:10px; overflow:hidden; }
   details summary { cursor:pointer; padding:0.6rem 0.9rem; font-family:var(--display); font-size:0.85rem; letter-spacing:0.03em; }
   details[open] summary { border-bottom:1px solid var(--line); }
   details .inner { padding:0.8rem 0.9rem; }
@@ -133,7 +174,13 @@
 
 <div class="app">
   <header class="hdr">
-    <div class="brand">Cloudflare OS <span class="dot">Studio</span><small>Discovery → Design → Build · vendor cockpit</small></div>
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 2 L20.66 7 L20.66 17 L12 22 L3.34 17 L3.34 7 Z"></path>
+        <circle cx="12" cy="12" r="3.2"></circle>
+      </svg>
+      <div>Cloudflare OS <span class="dot">Studio</span><small>Discovery → Design → Build · vendor cockpit</small></div>
+    </div>
     <div class="spacer"></div>
     <select id="clientSel" aria-label="Active client"></select>
     <button id="btnNew" title="Start a new client engagement">+ New client</button>
@@ -143,9 +190,9 @@
   </header>
 
   <nav class="tabs" aria-label="Phases">
-    <button data-tab="discovery" class="active"><span class="n">1</span>Discovery</button>
-    <button data-tab="design"><span class="n">2</span>Design &amp; Scope</button>
-    <button data-tab="build"><span class="n">3</span>Build Guide</button>
+    <button data-tab="discovery" class="active"><span class="n">1</span>Discovery<span class="tab-badge" id="tb-discovery" title="use cases captured"></span></button>
+    <button data-tab="design"><span class="n">2</span>Design &amp; Scope<span class="tab-badge" id="tb-design" title="pilot workflows"></span></button>
+    <button data-tab="build"><span class="n">3</span>Build Guide<span class="tab-badge" id="tb-build" title="setup progress"></span></button>
   </nav>
 
   <main id="view"></main>
@@ -415,16 +462,16 @@ function renderDiscovery(){
   const ucRows = c.useCases.map((u,i)=>{
     const hrsMo = Math.round(u.freq * u.minutes * u.people * 4.33 / 60);
     return `<tr>
-      <td style="white-space:normal; min-width:14rem"><input type="text" value="${esc(u.name)}" data-uc="${i}" data-f="name" style="width:100%"></td>
-      <td><input type="text" value="${esc(u.dept)}" data-uc="${i}" data-f="dept"></td>
-      <td class="num"><input type="number" min="0" value="${u.freq}" data-uc="${i}" data-f="freq" title="times per week"></td>
-      <td class="num"><input type="number" min="0" value="${u.minutes}" data-uc="${i}" data-f="minutes" title="minutes each"></td>
-      <td class="num"><input type="number" min="1" value="${u.people}" data-uc="${i}" data-f="people" title="people affected"></td>
-      <td class="num"><input type="number" min="1" max="5" value="${u.feas}" data-uc="${i}" data-f="feas" title="feasibility 1–5"></td>
-      <td><select data-uc="${i}" data-f="risk">${["A","B","C"].map(r=>`<option value="${r}" ${u.risk===r?"selected":""}>${r}</option>`).join("")}</select></td>
-      <td class="num"><strong>${hrsMo}</strong></td>
-      <td style="text-align:center"><input type="checkbox" data-uc-pilot="${i}" ${u.pilot?"checked":""} title="include in pilot"></td>
-      <td class="row-actions"><button data-del-uc="${i}" class="danger">✕</button></td>
+      <td class="c-name" data-label="Use case" style="white-space:normal; min-width:14rem"><input type="text" value="${esc(u.name)}" data-uc="${i}" data-f="name" style="width:100%"></td>
+      <td class="c-dept" data-label="Dept"><input type="text" value="${esc(u.dept)}" data-uc="${i}" data-f="dept"></td>
+      <td class="num" data-label="Freq/wk"><input type="number" min="0" value="${u.freq}" data-uc="${i}" data-f="freq" title="times per week"></td>
+      <td class="num" data-label="Minutes"><input type="number" min="0" value="${u.minutes}" data-uc="${i}" data-f="minutes" title="minutes each"></td>
+      <td class="num" data-label="People"><input type="number" min="1" value="${u.people}" data-uc="${i}" data-f="people" title="people affected"></td>
+      <td class="num" data-label="Feas 1–5"><input type="number" min="1" max="5" value="${u.feas}" data-uc="${i}" data-f="feas" title="feasibility 1–5"></td>
+      <td data-label="Risk"><select data-uc="${i}" data-f="risk">${["A","B","C"].map(r=>`<option value="${r}" ${u.risk===r?"selected":""}>${r}</option>`).join("")}</select></td>
+      <td class="num c-hrs" data-label="Hrs/mo"><strong>${hrsMo}</strong></td>
+      <td class="c-pilot" data-label="Pilot" style="text-align:center"><input type="checkbox" data-uc-pilot="${i}" ${u.pilot?"checked":""} title="include in pilot"></td>
+      <td class="row-actions c-del" data-label="Remove"><button data-del-uc="${i}" class="danger">✕</button></td>
     </tr>`;
   }).join("");
 
@@ -505,7 +552,7 @@ function renderDiscovery(){
     <p class="hint">Add rows from interviews and the inbox log — or seed from the vertical's known winners. Risk: A read-only · B write behind approval · C external side effects (don't pilot C).</p>
     <button id="btnSeed">Seed starter use cases for ${VERTICALS[c.vertical].label}</button>
     <button id="btnAddUc" class="primary">+ Add use case</button>
-    <div class="tbl" style="margin-top:0.7rem">${c.useCases.length ? `<table><thead><tr><th>Use case</th><th>Dept</th><th>Freq/wk</th><th>Min</th><th>People</th><th>Feas 1–5</th><th>Risk</th><th>Hrs/mo</th><th>Pilot</th><th></th></tr></thead><tbody>${ucRows}</tbody></table>` : '<p class="empty">No use cases yet.</p>'}</div>
+    <div class="tbl" style="margin-top:0.7rem">${c.useCases.length ? `<table id="ucTable"><thead><tr><th>Use case</th><th>Dept</th><th>Freq/wk</th><th>Min</th><th>People</th><th>Feas 1–5</th><th>Risk</th><th>Hrs/mo</th><th>Pilot</th><th></th></tr></thead><tbody>${ucRows}</tbody></table>` : '<p class="empty">No use cases yet — seed the vertical starters above, or add your first from an interview.</p>'}</div>
   </div>
 
   <div class="card">
@@ -535,7 +582,9 @@ function renderDiscovery(){
       <div class="codeblock"><pre id="workerSnippet"></pre><button class="copy" id="btnCopyWorker">Copy</button></div>
       <p style="font-size:0.9rem">Deploy with <code>wrangler deploy</code>, set the secret with <code>wrangler secret put ANTHROPIC_API_KEY</code>, then paste the Worker's URL into the endpoint field above. Lock CORS to your studio hostname and put Access in front of the proxy too — never ship a provider key to the browser.</p>
     </div></details>
-  </div>`;
+  </div>
+
+  ${phaseNav("discovery")}`;
 }
 
 function wireDiscovery(){
@@ -778,7 +827,7 @@ Admin training, staging-tested upgrade runbook, governance council, signed accep
 function renderDesign(){
   const m = designModel(); const c = m.c;
   if (!c.useCases.length && !c.systems.length) {
-    return `<h2>Phase 2 · Design &amp; Scope</h2><p class="hint">Nothing to generate yet — fill in the profile, systems, and use cases in Discovery first. This tab builds itself from that data.</p>`;
+    return `<h2>Phase 2 · Design &amp; Scope</h2><p class="hint">Nothing to generate yet — fill in the profile, systems, and use cases in Discovery first. This tab builds itself from that data.</p>${phaseNav("design")}`;
   }
   const pilotRows = m.pilots.map(u=>`<tr><td style="white-space:normal">${esc(u.name)}</td><td>${esc(u.dept)}</td><td class="num">${Math.round(u.hrsMo)}</td><td><span class="pill tier${u.risk}">${RISK_LABEL[u.risk]}</span></td><td style="white-space:normal">${u.systems.map(id=>{const s=SYS.find(x=>x.id===id);return s?esc(s.label.split(" (")[0]):id;}).join(", ")||"—"}</td></tr>`).join("");
   const intRows = m.chosen.sort((a,b)=>a.wave-b.wave).map(s=>`<tr><td>${esc(s.label)}</td><td><span class="pill ${s.kind}">${s.kind==="stock"?"stock":"custom · "+s.cls}</span></td><td class="num">${s.wave}</td><td>${s.effort}</td></tr>`).join("");
@@ -827,7 +876,9 @@ function renderDesign(){
 
   <div class="card"><h3>Scope document <span class="tag">markdown, ready for your proposal</span></h3>
     <button class="primary" id="btnCopyScope">Copy scope doc (Markdown)</button>
-  </div>`;
+  </div>
+
+  ${phaseNav("design")}`;
 }
 function wireDesign(){
   const b = document.getElementById("btnCopyScope");
@@ -1097,7 +1148,7 @@ function renderBuild(){
         ${s.verify?`<div class="verify"><b>You know it worked when</b>${s.verify}</div>`:""}
       </div>
     </div>`).join("");
-  return header + body;
+  return header + body + phaseNav("build");
 }
 function wireBuild(){
   const c = C();
@@ -1109,13 +1160,42 @@ function wireBuild(){
 }
 
 /* =============================== render =============================== */
+const PHASES = [
+  { id: "discovery", label: "Discovery" },
+  { id: "design", label: "Design & Scope" },
+  { id: "build", label: "Build Guide" }
+];
+function phaseNav(cur){
+  const i = PHASES.findIndex(p => p.id === cur);
+  const prev = PHASES[i - 1], next = PHASES[i + 1];
+  return `<div class="phase-nav">
+    ${prev ? `<button data-goto="${prev.id}">← ${prev.label}</button>` : `<span></span>`}
+    ${next ? `<button class="primary" data-goto="${next.id}">Continue to ${next.label} →</button>` : `<span></span>`}
+  </div>`;
+}
+function renderBadges(){
+  const c = C();
+  const uc = c.useCases.length;
+  document.getElementById("tb-discovery").textContent = uc ? String(uc) : "";
+  const pilots = c.useCases.some(u => u.pilot)
+    ? c.useCases.filter(u => u.pilot).length
+    : Math.min(5, c.useCases.filter(u => u.risk !== "C").length);
+  document.getElementById("tb-design").textContent = pilots ? String(pilots) : "";
+  const steps = buildSteps(c);
+  const done = steps.filter(s => c.steps[s.id]).length;
+  document.getElementById("tb-build").textContent = done ? `${done}/${steps.length}` : "";
+}
 function render(){
   renderHeader();
+  renderBadges();
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === db.tab));
   const v = document.getElementById("view");
   if (db.tab === "design")      { v.innerHTML = renderDesign();    wireDesign(); }
   else if (db.tab === "build")  { v.innerHTML = renderBuild();     wireBuild(); }
   else                          { v.innerHTML = renderDiscovery(); wireDiscovery(); }
+  document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => {
+    db.tab = b.dataset.goto; save(); render(); window.scrollTo(0, 0);
+  });
 }
 render();
 </script>
