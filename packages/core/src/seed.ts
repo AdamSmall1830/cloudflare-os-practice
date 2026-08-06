@@ -17,6 +17,7 @@ export function blankClient(name: string): ClientRecord {
     domainOnCf: "yes",
     provider: "anthropic",
     dailyLimit: 100,
+    hourlyRate: 50,
     systems: [],
     otherSystems: "",
     interviews: [],
@@ -45,6 +46,7 @@ export function hqClient(): ClientRecord {
     domainOnCf: "no",
     provider: "anthropic",
     dailyLimit: 200,
+    hourlyRate: 60,
     systems: ["ghl", "google", "qbo", "stripe", "cfapi"],
     otherSystems: "E-signature via GoHighLevel Documents",
     approvers: {

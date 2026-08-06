@@ -31,6 +31,7 @@ export function designModel(client: ClientRecord): DesignModel {
   const pilots = autoSuggested ? suggested : manual;
 
   const totalHrs = Math.round(pilots.reduce((a, u) => a + u.hrsMo, 0));
+  const totalValue = Math.round(totalHrs * (client.hourlyRate || 50));
 
   const size = Number(client.size || 0);
   const small = size > 0 && size <= 30;
@@ -48,6 +49,7 @@ export function designModel(client: ClientRecord): DesignModel {
     pilots,
     autoSuggested,
     totalHrs,
+    totalValue,
     weeks,
     intWeeks,
     discoveryWeeks,
@@ -75,7 +77,7 @@ Deploy Cloudflare OS as a governed AI agent workspace in ${c.name}'s own Cloudfl
 ## Pilot workflows (${m.pilots.length})
 ${m.pilots.map((u) => `- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo)} hrs/month recovered · risk tier ${u.risk}`).join("\n")}
 
-Estimated recoverable time across pilot: **~${m.totalHrs} hours/month**.
+Estimated recoverable time across pilot: **~${m.totalHrs} hours/month ≈ $${m.totalValue}/month** at a $${c.hourlyRate || 50}/hr loaded rate.
 
 ## Integrations
 | System | Type | Wave | Build effort |

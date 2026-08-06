@@ -105,6 +105,8 @@ export interface ClientRecord {
   provider: ModelProvider;
   /** Per-user daily free LLM-call allowance (DAILY_LLM_CALL_LIMIT). */
   dailyLimit: number;
+  /** Loaded hourly rate in dollars, used to convert recovered hours into ROI. */
+  hourlyRate: number;
   /** Selected system ids from the catalog. */
   systems: string[];
   otherSystems: string;
@@ -138,6 +140,8 @@ export interface DesignModel {
   autoSuggested: boolean;
   /** Total recoverable hours/month across the pilot set. */
   totalHrs: number;
+  /** totalHrs × hourlyRate — the dollar value anchor per month. */
+  totalValue: number;
   /** Estimated engagement length in weeks. */
   weeks: number;
   /** Integration-phase weeks. */
@@ -156,6 +160,27 @@ export interface BuildStep {
   code?: string;
   /** "You know it worked when …" acceptance criterion. */
   verify: string;
+}
+
+/** One evaluation case: a golden task or a red-team probe. */
+export interface EvalCase {
+  id: string;
+  kind: "golden" | "redteam";
+  title: string;
+  /** What to ask the agent / do, verbatim, in a fresh workspace. */
+  prompt: string;
+  /** Human-judgeable pass criteria, including what the observation log must show. */
+  expected: string;
+  /** Red-team cases are blockers by default; golden cases majors. */
+  severity: "blocker" | "major" | "minor";
+  tags: string[];
+}
+
+/** A named suite of eval cases — one per pilot workflow plus the platform suite. */
+export interface EvalSuite {
+  /** "platform" for the universal guardrail suite, else the workflow name. */
+  workflow: string;
+  cases: EvalCase[];
 }
 
 /** Result of parsing an AI-assist response. */

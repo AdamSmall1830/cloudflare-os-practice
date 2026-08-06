@@ -291,7 +291,7 @@ const LS_KEY = "cfos-studio-v1";
 let db = load(); save();
 function blankClient(name){
   return { name, vertical:"other", size:"", sponsor:"", itOwner:"", domain:"", accountId:"", audience:"",
-    adminEmails:"", idp:"access", domainOnCf:"yes", provider:"anthropic", dailyLimit:100,
+    adminEmails:"", idp:"access", domainOnCf:"yes", provider:"anthropic", dailyLimit:100, hourlyRate:50,
     systems:[], otherSystems:"", interviews:[], inbox:[], surveyNotes:"", artifacts:"",
     useCases:[], approvers:{ payments:"", sends:"", records:"" }, steps:{} };
 }
@@ -300,7 +300,7 @@ function hqClient(){
   return Object.assign(blankClient("Our Firm — Cloudflare OS HQ"), {
     vertical: "agency", size: 3,
     sponsor: "Adam (Principal)", itOwner: "Adam (Principal)",
-    idp: "access", domainOnCf: "no", provider: "anthropic", dailyLimit: 200,
+    idp: "access", domainOnCf: "no", provider: "anthropic", dailyLimit: 200, hourlyRate: 60,
     systems: ["ghl","google","qbo","stripe","cfapi"],
     otherSystems: "E-signature via GoHighLevel Documents",
     approvers: { payments: "Adam (Principal)", sends: "Adam (Principal)", records: "Adam (Principal)" },
@@ -510,6 +510,7 @@ function renderDiscovery(){
         <option value="workersai" ${c.provider==="workersai"?"selected":""}>Workers AI only</option></select></div>
       <div class="field"><label>Admin emails (comma-separated)</label><input type="text" id="f-adminEmails" value="${esc(c.adminEmails)}" placeholder="you@yourfirm.com, it@acme.com"></div>
       <div class="field"><label>Daily LLM calls per user (free allowance)</label><input type="number" id="f-dailyLimit" value="${c.dailyLimit}" min="10"></div>
+      <div class="field"><label>Loaded hourly rate $ (for ROI math)</label><input type="number" id="f-hourlyRate" value="${c.hourlyRate||50}" min="1"></div>
     </div>
     <div class="grid2" style="margin-top:0.7rem">
       <div class="field"><label>Approver — payments / refunds</label><input type="text" id="f-ap-pay" value="${esc(c.approvers.payments)}"></div>
@@ -590,7 +591,7 @@ function renderDiscovery(){
 function wireDiscovery(){
   const c = C();
   bind("f-name","name"); bind("f-size","size"); bind("f-sponsor","sponsor"); bind("f-itOwner","itOwner");
-  bind("f-domain","domain"); bind("f-adminEmails","adminEmails"); bind("f-dailyLimit","dailyLimit");
+  bind("f-domain","domain"); bind("f-adminEmails","adminEmails"); bind("f-dailyLimit","dailyLimit"); bind("f-hourlyRate","hourlyRate");
   bind("f-otherSystems","otherSystems"); bind("f-surveyNotes","surveyNotes");
   bind("f-ap-pay","approvers.payments"); bind("f-ap-send","approvers.sends"); bind("f-ap-rec","approvers.records");
   document.getElementById("f-name").addEventListener("change", ()=>{ renderHeader(); });
@@ -787,10 +788,11 @@ function designModel(){
   const suggested = ranked.filter(u=>u.risk!=="C").slice(0,5);
   if (!pilots.length) pilots = suggested;
   const totalHrs = Math.round(pilots.reduce((a,u)=>a+u.hrsMo,0));
+  const totalVal = Math.round(totalHrs * (c.hourlyRate||50));
   const small = Number(c.size||0) > 0 && Number(c.size) <= 30;
   const intWeeks = Math.max(2, Math.ceil(custom.length*1.5));
   const weeks = (small?2:3) + 1 + intWeeks + 3 + (Number(c.size)>100?4:3) + 2;
-  return { c, chosen, stock, custom, ranked, pilots, suggested, totalHrs, weeks, small, intWeeks };
+  return { c, chosen, stock, custom, ranked, pilots, suggested, totalHrs, totalVal, weeks, small, intWeeks };
 }
 
 function scopeMarkdown(m){
@@ -804,7 +806,7 @@ Deploy Cloudflare OS as a governed AI agent workspace in ${c.name}'s own Cloudfl
 ## Pilot workflows (${m.pilots.length})
 ${m.pilots.map(u=>`- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo)} hrs/month recovered · risk tier ${u.risk}`).join("\n")}
 
-Estimated recoverable time across pilot: **~${m.totalHrs} hours/month**.
+Estimated recoverable time across pilot: **~${m.totalHrs} hours/month ≈ $${m.totalVal}/month** at a $${c.hourlyRate||50}/hr loaded rate.
 
 ## Integrations
 | System | Type | Wave | Build effort |
@@ -842,7 +844,7 @@ function renderDesign(){
 
   <div class="card"><h3>Pilot charter <span class="tag">${c.useCases.some(u=>u.pilot) ? "your manual pilot selection" : "auto-suggested: top 5 by value × feasibility, C-risk excluded — tick Pilot boxes in Discovery to override"}</span></h3>
     <div class="tbl"><table><thead><tr><th>Workflow</th><th>Dept</th><th>Hrs/mo</th><th>Risk</th><th>Systems</th></tr></thead><tbody>${pilotRows || '<tr><td colspan="5" class="empty">Add use cases in Discovery.</td></tr>'}</tbody></table></div>
-    <p style="margin:0.6rem 0 0"><strong>~${m.totalHrs} hours/month</strong> of recoverable time across the pilot set — this is your value anchor for pricing.</p>
+    <p style="margin:0.6rem 0 0"><strong>~${m.totalHrs} hours/month ≈ $${m.totalVal.toLocaleString()}/month</strong> of recoverable value across the pilot set (at $${c.hourlyRate||50}/hr loaded) — this is your anchor for pricing and for the pilot's METRICS log.</p>
   </div>
 
   <div class="card"><h3>Integration map <span class="tag">${m.stock.length} stock · ${m.custom.length} custom gatekeepers</span></h3>

@@ -43,7 +43,7 @@ describe("scopeMarkdown", () => {
   it("renders a deterministic proposal document", () => {
     const md = scopeMarkdown(designModel(hqClient()), { date: "2026-08-06" });
     expect(md).toContain("# Our Firm — Cloudflare OS HQ — Cloudflare OS Deployment: Proposed Scope");
-    expect(md).toContain("~51 hours/month");
+    expect(md).toContain("~51 hours/month ≈ $3060/month** at a $60/hr loaded rate");
     expect(md).toContain("| GoHighLevel (CRM · funnels · booking · payments) | Custom gatekeeper (OAuth SaaS REST) | 2 | 1–2 weeks |");
     expect(md).toContain("payments → Adam (Principal)");
   });

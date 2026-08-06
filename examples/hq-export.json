@@ -13,6 +13,7 @@
     "domainOnCf": "no",
     "provider": "anthropic",
     "dailyLimit": 200,
+    "hourlyRate": 60,
     "systems": [
       "ghl",
       "google",
