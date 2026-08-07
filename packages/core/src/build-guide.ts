@@ -165,17 +165,48 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
   });
 
   const sysSteps = systemSteps(c, host);
+  const routes = c.mcpRoutes ?? {};
   for (const s of SYSTEMS.filter((s) => c.systems.includes(s.id)).sort((a, b) => a.wave - b.wave)) {
+    if (s.kind === "custom" && routes[s.id]) {
+      steps.push({
+        id: `mcp-${s.id}`,
+        title: `Connect ${s.label} via MCP Server Portal`,
+        body: `This system is routed through the vendor's remote MCP server — configuration, not code.
+1. Confirm the vendor's official MCP server URL and auth method in their developer docs (re-verify at build time; tool surfaces change).
+2. Zero Trust dashboard → **AI controls → MCP servers** → add the server; complete its OAuth/auth flow with a client-owned account.
+3. Add it to the deployment's **Portal**; scope which tools each user group may call — start read-only tools only.
+4. Policy check against the rule of thumb: if this system needs your own approval semantics on writes, ethical walls, or minimum-necessary scoping, take it off the portal route and build the gatekeeper instead.`,
+        verify: `A pilot user's agent can call an allowed ${s.label} tool; disallowed tools are absent; the call appears in the portal's logs.`,
+      });
+      continue;
+    }
     const d = sysSteps[s.id];
     if (!d) continue;
     steps.push({ id: `sys-${s.id}`, title: d.title, body: d.body, code: d.code, verify: d.verify });
   }
 
+  const kn = c.knowledge ?? [];
+  const knLines = kn.length
+    ? kn
+        .map((k) => {
+          const route =
+            k.type === "wiki"
+              ? "connect live via its gatekeeper"
+              : k.type === "templates"
+                ? "load as document/slide templates"
+                : k.type === "data"
+                  ? "leave in-system; agents read live through gatekeepers"
+                  : "ingest to R2 + AI Search (hybrid retrieval)";
+          return `   - **${k.name}** (owner: ${k.owner || "TBD"}) → ${route}`;
+        })
+        .join("\n")
+    : "   - (no sources inventoried yet — capture them in Discovery's knowledge card)";
   steps.push({
     id: "knowledge",
     title: "Load knowledge & skills",
-    body: `1. Collect the SOP corpus (playbook Section 05 checklist) into an R2-backed knowledge source; connect the wiki via its gatekeeper.
-2. Write the first 10–15 skills files (\`.agents/skills/\`) — one per pilot workflow, in the client's vocabulary, starting from the vertical kit and edited with the champion beside you.
+    body: `1. Route each inventoried knowledge source (owners chase their own):
+${knLines}
+2. Write the first 10–15 skills files (\`.agents/skills/\`) — one per pilot workflow, in the client's vocabulary, starting from the vertical kit and edited with the champion beside you (craft rules: docs/skills-guide.md).
 3. Load the ${vertical.label} guardrails into a standing policy skill: *${vertical.guard}*`,
     verify:
       "A champion runs a pilot workflow cold; the agent uses the right terms, process, and sources — confirmed in the observation log.",
@@ -444,6 +475,8 @@ export function buildGuideMarkdown(c: ClientRecord): string {
   const steps = buildSteps(c);
   const head = `# ${c.name} — Cloudflare OS Setup Guide
 Generated from the engagement record by @cfos-practice/core. Follow top to bottom; each step ends with its acceptance check.
+
+> **How this connects to the Cloudflare account:** this guide's generator never touches it — the connection happens in step 1 (\`wrangler login\` signs the deploy machine in via the browser; \`pnpm deploy\` pushes the workspace). When the guide completes, Cloudflare OS is a website at the client's hostname behind Access — that's where users log in daily.
 `;
   const body = steps
     .map((s, i) => {

@@ -72,13 +72,20 @@ Anchor from the design: **~${m.totalHrs} hrs/month ≈ $${fmtNum(m.totalValue)}/
 }
 
 function securityBaseline(c: ClientRecord): string {
+  const routes = c.mcpRoutes ?? {};
   const rows = c.systems
     .map((id) => systemById(id))
     .filter((s): s is NonNullable<typeof s> => !!s)
-    .map(
-      (s) =>
-        `| ${s.label} | ${s.kind === "stock" ? "OAuth/app credential (stock gatekeeper)" : "API credential (custom gatekeeper or MCP portal)"} | Minimum scopes per SETUP.md step | Gatekeeper Worker secret / portal config | 90 days | ${c.itOwner || "IT owner"} |`,
-    )
+    .map((s) => {
+      const cred =
+        s.kind === "stock"
+          ? "OAuth/app credential (stock gatekeeper)"
+          : routes[s.id]
+            ? "Vendor MCP server OAuth (via MCP Server Portal)"
+            : "API credential (custom gatekeeper)";
+      const stored = routes[s.id] ? "Portal configuration (Cloudflare One)" : "Gatekeeper Worker secret";
+      return `| ${s.label} | ${cred} | Minimum scopes/tools per SETUP.md step | ${stored} | 90 days | ${c.itOwner || "IT owner"} |`;
+    })
     .join("\n");
   return `# ${c.name} — Security Baseline
 
@@ -126,9 +133,10 @@ export function generateFiles(c: ClientRecord): GeneratedFile[] {
   files.push({ path: "deployment.jsonc", content: deploymentJsonc(c) + "\n" });
   files.push({ path: "SETUP.md", content: buildGuideMarkdown(c) });
 
+  const routes = c.mcpRoutes ?? {};
   const custom = c.systems
     .map((id) => systemById(id))
-    .filter((s): s is NonNullable<typeof s> => !!s && s.kind === "custom");
+    .filter((s): s is NonNullable<typeof s> => !!s && s.kind === "custom" && !routes[s.id]);
   for (const s of custom) {
     const approver =
       s.id === "qbo" || s.id === "stripe" || s.id === "square"

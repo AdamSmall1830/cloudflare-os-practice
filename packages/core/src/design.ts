@@ -23,6 +23,9 @@ export function designModel(client: ClientRecord): DesignModel {
   const chosen = SYSTEMS.filter((s) => client.systems.includes(s.id));
   const stock = chosen.filter((s) => s.kind === "stock");
   const custom = chosen.filter((s) => s.kind === "custom");
+  const routes = client.mcpRoutes ?? {};
+  const mcpRouted = custom.filter((s) => routes[s.id]);
+  const customBuild = custom.filter((s) => !routes[s.id]);
 
   const ranked = rankUseCases(client.useCases);
   const manual = ranked.filter((u) => u.pilot);
@@ -33,11 +36,13 @@ export function designModel(client: ClientRecord): DesignModel {
   const totalHrs = Math.round(pilots.reduce((a, u) => a + u.hrsMo, 0));
   const hourlyRate = effectiveRate(client.hourlyRate);
   const totalValue = totalHrs * hourlyRate;
+  const workflows = pilots.filter((u) => u.cadence && u.cadence !== "demand");
 
   const size = Number(client.size || 0);
   const small = size > 0 && size <= 30;
   const discoveryWeeks = small ? 2 : 3;
-  const intWeeks = Math.max(2, Math.ceil(custom.length * 1.5));
+  // MCP-routed systems are portal config, not builds — they don't drive integration weeks.
+  const intWeeks = Math.max(2, Math.ceil(customBuild.length * 1.5));
   const rolloutWeeks = size > 100 ? 4 : 3;
   const weeks = discoveryWeeks + 1 + intWeeks + 3 + rolloutWeeks + 2;
 
@@ -46,6 +51,9 @@ export function designModel(client: ClientRecord): DesignModel {
     chosen,
     stock,
     custom,
+    mcpRouted,
+    customBuild,
+    workflows,
     ranked,
     pilots,
     autoSuggested,
@@ -82,14 +90,43 @@ ${m.pilots.map((u) => `- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo
 Estimated recoverable time across pilot: **~${m.totalHrs} hours/month ≈ $${fmtNum(m.totalValue)}/month** at a $${m.hourlyRate}/hr loaded rate.
 
 ## Integrations
-| System | Type | Wave | Build effort |
+| System | Path | Wave | Effort |
 |---|---|---|---|
 ${m.chosen
-  .map(
-    (s) =>
-      `| ${s.label} | ${s.kind === "stock" ? "Stock gatekeeper" : `Custom gatekeeper (${s.cls})`} | ${s.wave} | ${s.effort} |`,
-  )
+  .map((s) => {
+    const routed = m.mcpRouted.some((r) => r.id === s.id);
+    const path = s.kind === "stock" ? "Stock gatekeeper" : routed ? "Vendor MCP server via MCP Server Portal" : `Custom gatekeeper (${s.cls})`;
+    const effort = routed ? "0.5–1 day (portal config)" : s.effort;
+    return `| ${s.label} | ${path} | ${s.wave} | ${effort} |`;
+  })
   .join("\n")}
+${
+  m.workflows.length
+    ? `
+## Automation (platform Workflows)
+${m.workflows.map((u) => `- **${u.name}** — runs ${u.cadence === "event" ? "on external events (webhook-triggered)" : u.cadence}`).join("\n")}
+`
+    : ""
+}${
+  (m.client.knowledge ?? []).length
+    ? `
+## Knowledge & retrieval plan
+${(m.client.knowledge ?? [])
+  .map((k) => {
+    const route =
+      k.type === "wiki"
+        ? "connected live via its gatekeeper"
+        : k.type === "templates"
+          ? "loaded as document/slide templates"
+          : k.type === "data"
+            ? "read live through gatekeepers (never copied)"
+            : "ingested to R2 + AI Search (hybrid retrieval)";
+    return `- **${k.name}** (${k.owner || "owner TBD"}) — ${route}`;
+  })
+  .join("\n")}
+`
+    : ""
+}
 
 ## Governance
 - Sign-in: ${signIn}

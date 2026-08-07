@@ -292,7 +292,7 @@ let db = load(); save();
 function blankClient(name){
   return { name, vertical:"other", size:"", sponsor:"", itOwner:"", domain:"", accountId:"", audience:"",
     adminEmails:"", idp:"access", domainOnCf:"yes", provider:"anthropic", dailyLimit:100, hourlyRate:50,
-    systems:[], otherSystems:"", interviews:[], inbox:[], surveyNotes:"", artifacts:"",
+    systems:[], mcpRoutes:{}, knowledge:[], otherSystems:"", interviews:[], inbox:[], surveyNotes:"", artifacts:"",
     useCases:[], approvers:{ payments:"", sends:"", records:"" }, steps:{} };
 }
 function hqClient(){
@@ -302,6 +302,12 @@ function hqClient(){
     sponsor: "Adam (Principal)", itOwner: "Adam (Principal)",
     idp: "access", domainOnCf: "no", provider: "anthropic", dailyLimit: 200, hourlyRate: 60,
     systems: ["ghl","google","qbo","stripe","cfapi"],
+    mcpRoutes: { stripe: true },
+    knowledge: [
+      { name: "Delivery playbook (12 sections)", type: "sops", owner: "Adam" },
+      { name: "Proposal deck + scope templates", type: "templates", owner: "Adam" },
+      { name: "GHL pipeline + engagement records", type: "data", owner: "Adam" }
+    ],
     otherSystems: "E-signature via GoHighLevel Documents",
     approvers: { payments: "Adam (Principal)", sends: "Adam (Principal)", records: "Adam (Principal)" },
     interviews: [{ person: "Adam", role: "Principal", date: "", _open: false, answers: {
@@ -321,7 +327,8 @@ function hqClient(){
       { text: "Assembled the weekly status update by hand from email threads + commit log", dept: "Delivery", freq: 4 }
     ],
     surveyNotes: "Small-team firm. Recurring themes: lead-reply drafting, proposal assembly, prerequisite chasing, and status reporting — all flowing through GoHighLevel + Google Workspace, invoiced via QBO/Stripe. Target architecture is the delivery-factory pipeline in playbook Section 12; this HQ deployment is its foundation.",
-    useCases: starters.map((s, i) => ({ ...s, systems: [...s.systems], pilot: i < 4 }))
+    useCases: starters.map((s, i) => ({ ...s, systems: [...s.systems], pilot: i < 4,
+      cadence: ["event","demand","demand","weekly","daily","event","weekly"][i] || "demand" }))
   });
 }
 function load(){
@@ -471,6 +478,7 @@ function renderDiscovery(){
       <td class="num" data-label="People"><input type="number" min="1" value="${u.people}" data-uc="${i}" data-f="people" title="people affected"></td>
       <td class="num" data-label="Feas 1–5"><input type="number" min="1" max="5" value="${u.feas}" data-uc="${i}" data-f="feas" title="feasibility 1–5"></td>
       <td data-label="Risk"><select data-uc="${i}" data-f="risk">${["A","B","C"].map(r=>`<option value="${r}" ${u.risk===r?"selected":""}>${r}</option>`).join("")}</select></td>
+      <td data-label="Cadence"><select data-uc="${i}" data-f="cadence" title="scheduled/event cadences become platform Workflows">${[["demand","On demand"],["daily","Daily"],["weekly","Weekly"],["event","Event"]].map(o=>`<option value="${o[0]}" ${(u.cadence||"demand")===o[0]?"selected":""}>${o[1]}</option>`).join("")}</select></td>
       <td class="num c-hrs" data-label="Hrs/mo"><strong>${hrsMo}</strong></td>
       <td class="c-pilot" data-label="Pilot" style="text-align:center"><input type="checkbox" data-uc-pilot="${i}" ${u.pilot?"checked":""} title="include in pilot"></td>
       <td class="row-actions c-del" data-label="Remove"><button data-del-uc="${i}" class="danger">✕</button></td>
@@ -524,7 +532,37 @@ function renderDiscovery(){
   <div class="card">
     <h3>Systems inventory <span class="tag">check everything they run — this becomes the Gatekeeper map</span></h3>
     <div class="checks">${sysBoxes}</div>
+    ${(() => {
+      const routed = c.mcpRoutes || {};
+      const checkedCustom = SYS.filter(s => s.kind === "custom" && c.systems.includes(s.id));
+      if (!checkedCustom.length) return "";
+      return `<div class="guard-note" style="margin-top:0.8rem"><b>Integration path — check the cheapest governed route first</b>
+        For each custom system, if the vendor publishes an official remote MCP server, route it through an <strong>MCP Server Portal</strong> (config, not code — verify the vendor's docs at build time). Keep the gatekeeper build where you need approval semantics on writes, walls, or PHI scoping.
+        <div class="checks" style="margin-top:0.5rem">${checkedCustom.map(s =>
+          `<label><input type="checkbox" data-mcp="${s.id}" ${routed[s.id] ? "checked" : ""}> ${esc(s.label.split(" (")[0])} <span class="pill ${routed[s.id] ? "stock" : "custom"}">${routed[s.id] ? "via MCP portal" : "build gatekeeper"}</span></label>`).join("")}
+        </div></div>`;
+    })()}
     <div class="field" style="margin-top:0.7rem"><label>Other systems (free text)</label><input type="text" id="f-otherSystems" value="${esc(c.otherSystems)}" placeholder="e.g. Fishbowl inventory, legacy Access DB"></div>
+  </div>
+
+  <div class="card">
+    <h3>Knowledge inventory <span class="tag">what the agents must know — becomes the retrieval plan</span></h3>
+    <p class="hint">SOPs/docs → ingested to R2 + AI Search (hybrid retrieval). Wiki → connected live via its gatekeeper. Templates → document/slide templates. Live business data → stays in-system, read through gatekeepers.</p>
+    <div class="grid2" style="margin-bottom:0.6rem">
+      <div class="field"><label>Source name</label><input type="text" id="knName" placeholder="e.g. Front-desk SOP binder"></div>
+      <div class="field"><label>Type</label><select id="knType">
+        <option value="sops">SOPs / documents → R2 + AI Search</option>
+        <option value="wiki">Wiki (Notion/Confluence) → gatekeeper</option>
+        <option value="templates">Templates → document templates</option>
+        <option value="data">Live business data → gatekeeper reads</option>
+        <option value="other">Other</option></select></div>
+      <div class="field"><label>Owner</label><input type="text" id="knOwner" placeholder="who keeps it current"></div>
+    </div>
+    <button id="btnAddKn" class="primary">+ Add source</button>
+    <div class="tbl" style="margin-top:0.7rem">${(c.knowledge||[]).length ? `<table><thead><tr><th>Source</th><th>Route</th><th>Owner</th><th></th></tr></thead><tbody>${(c.knowledge||[]).map((k,i)=>{
+      const route = k.type==="wiki" ? "Wiki gatekeeper (live)" : k.type==="templates" ? "Document templates" : k.type==="data" ? "Gatekeeper reads (live)" : "R2 + AI Search";
+      return `<tr><td style="white-space:normal">${esc(k.name)}</td><td>${route}</td><td>${esc(k.owner)}</td><td class="row-actions"><button data-del-kn="${i}" class="danger">✕</button></td></tr>`;
+    }).join("")}</tbody></table>` : '<p class="empty">No sources yet — the corpus from the Section 05 checklist lands here.</p>'}</div>
   </div>
 
   <div class="card">
@@ -555,7 +593,7 @@ function renderDiscovery(){
     <p class="hint">Add rows from interviews and the inbox log — or seed from the vertical's known winners. Risk: A read-only · B write behind approval · C external side effects (don't pilot C).</p>
     <button id="btnSeed">Seed starter use cases for ${VERTICALS[c.vertical].label}</button>
     <button id="btnAddUc" class="primary">+ Add use case</button>
-    <div class="tbl" style="margin-top:0.7rem">${c.useCases.length ? `<table id="ucTable"><thead><tr><th>Use case</th><th>Dept</th><th>Freq/wk</th><th>Min</th><th>People</th><th>Feas 1–5</th><th>Risk</th><th>Hrs/mo</th><th>Pilot</th><th></th></tr></thead><tbody>${ucRows}</tbody></table>` : '<p class="empty">No use cases yet — seed the vertical starters above, or add your first from an interview.</p>'}</div>
+    <div class="tbl" style="margin-top:0.7rem">${c.useCases.length ? `<table id="ucTable"><thead><tr><th>Use case</th><th>Dept</th><th>Freq/wk</th><th>Min</th><th>People</th><th>Feas 1–5</th><th>Risk</th><th>Cadence</th><th>Hrs/mo</th><th>Pilot</th><th></th></tr></thead><tbody>${ucRows}</tbody></table>` : '<p class="empty">No use cases yet — seed the vertical starters above, or add your first from an interview.</p>'}</div>
   </div>
 
   <div class="card">
@@ -604,8 +642,21 @@ function wireDiscovery(){
   document.querySelectorAll("[data-sys]").forEach(cb => cb.onchange = () => {
     const id = cb.dataset.sys;
     c.systems = cb.checked ? [...new Set([...c.systems, id])] : c.systems.filter(x=>x!==id);
-    save();
+    save(); render();
   });
+  document.querySelectorAll("[data-mcp]").forEach(cb => cb.onchange = () => {
+    c.mcpRoutes = c.mcpRoutes || {};
+    c.mcpRoutes[cb.dataset.mcp] = cb.checked;
+    save(); render();
+  });
+  document.getElementById("btnAddKn").onclick = () => {
+    const name = document.getElementById("knName").value.trim();
+    if (!name) { toast("Name the source first"); return; }
+    c.knowledge = c.knowledge || [];
+    c.knowledge.push({ name, type: document.getElementById("knType").value, owner: document.getElementById("knOwner").value.trim() });
+    save(); render();
+  };
+  document.querySelectorAll("[data-del-kn]").forEach(b => b.onclick = () => { c.knowledge.splice(b.dataset.delKn, 1); save(); render(); });
   document.getElementById("btnAddIv").onclick = () => { c.interviews.push({ person:"", role:"", date:"", answers:{}, _open:true }); save(); render(); };
   document.querySelectorAll("[data-iv][data-f]").forEach(el => el.addEventListener("input", ()=>{ c.interviews[el.dataset.iv][el.dataset.f] = el.value; save(); }));
   document.querySelectorAll("[data-iv][data-q]").forEach(el => el.addEventListener("input", ()=>{ c.interviews[el.dataset.iv].answers[el.dataset.q] = el.value; save(); }));
@@ -784,6 +835,9 @@ function designModel(){
   const chosen = SYS.filter(s => c.systems.includes(s.id));
   const stock = chosen.filter(s=>s.kind==="stock");
   const custom = chosen.filter(s=>s.kind==="custom");
+  const routes = c.mcpRoutes || {};
+  const mcpRouted = custom.filter(s=>routes[s.id]);
+  const customBuild = custom.filter(s=>!routes[s.id]);
   const ranked = [...c.useCases].map(u => ({ ...u, hrsMo: u.freq*u.minutes*u.people*4.33/60, score: u.freq*u.minutes*u.people*u.feas }))
     .sort((a,b)=>b.score-a.score);
   let pilots = ranked.filter(u=>u.pilot);
@@ -792,10 +846,11 @@ function designModel(){
   const totalHrs = Math.round(pilots.reduce((a,u)=>a+u.hrsMo,0));
   const rate = effectiveRate(c.hourlyRate);
   const totalVal = totalHrs * rate;
+  const workflows = pilots.filter(u => u.cadence && u.cadence !== "demand");
   const small = Number(c.size||0) > 0 && Number(c.size) <= 30;
-  const intWeeks = Math.max(2, Math.ceil(custom.length*1.5));
+  const intWeeks = Math.max(2, Math.ceil(customBuild.length*1.5));
   const weeks = (small?2:3) + 1 + intWeeks + 3 + (Number(c.size)>100?4:3) + 2;
-  return { c, chosen, stock, custom, ranked, pilots, suggested, totalHrs, totalVal, rate, weeks, small, intWeeks };
+  return { c, chosen, stock, custom, mcpRouted, customBuild, workflows, ranked, pilots, suggested, totalHrs, totalVal, rate, weeks, small, intWeeks };
 }
 
 function scopeMarkdown(m){
@@ -812,9 +867,23 @@ ${m.pilots.map(u=>`- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo)} h
 Estimated recoverable time across pilot: **~${m.totalHrs} hours/month ≈ $${fmtNum(m.totalVal)}/month** at a $${m.rate}/hr loaded rate.
 
 ## Integrations
-| System | Type | Wave | Build effort |
+| System | Path | Wave | Effort |
 |---|---|---|---|
-${m.chosen.map(s=>`| ${s.label} | ${s.kind==="stock"?"Stock gatekeeper":"Custom gatekeeper ("+s.cls+")"} | ${s.wave} | ${s.effort} |`).join("\n")}
+${m.chosen.map(s=>{
+  const routed = m.mcpRouted.some(r=>r.id===s.id);
+  const path = s.kind==="stock" ? "Stock gatekeeper" : routed ? "Vendor MCP server via MCP Server Portal" : "Custom gatekeeper ("+s.cls+")";
+  return `| ${s.label} | ${path} | ${s.wave} | ${routed?"0.5–1 day (portal config)":s.effort} |`;
+}).join("\n")}
+${m.workflows.length ? `
+## Automation (platform Workflows)
+${m.workflows.map(u=>`- **${u.name}** — runs ${u.cadence==="event"?"on external events (webhook-triggered)":u.cadence}`).join("\n")}
+` : ""}${(c.knowledge||[]).length ? `
+## Knowledge & retrieval plan
+${(c.knowledge||[]).map(k=>{
+  const route = k.type==="wiki" ? "connected live via its gatekeeper" : k.type==="templates" ? "loaded as document/slide templates" : k.type==="data" ? "read live through gatekeepers (never copied)" : "ingested to R2 + AI Search (hybrid retrieval)";
+  return `- **${k.name}** (${k.owner||"owner TBD"}) — ${route}`;
+}).join("\n")}
+` : ""}
 
 ## Governance
 - Sign-in: ${c.idp==="access"?"Cloudflare Access + client IdP":c.idp==="google"?"Google OAuth (auth gatekeeper)":"Password (interim)"}
@@ -835,7 +904,12 @@ function renderDesign(){
     return `<h2>Phase 2 · Design &amp; Scope</h2><p class="hint">Nothing to generate yet — fill in the profile, systems, and use cases in Discovery first. This tab builds itself from that data.</p>${phaseNav("design")}`;
   }
   const pilotRows = m.pilots.map(u=>`<tr><td style="white-space:normal">${esc(u.name)}</td><td>${esc(u.dept)}</td><td class="num">${Math.round(u.hrsMo)}</td><td><span class="pill tier${u.risk}">${RISK_LABEL[u.risk]}</span></td><td style="white-space:normal">${u.systems.map(id=>{const s=SYS.find(x=>x.id===id);return s?esc(s.label.split(" (")[0]):id;}).join(", ")||"—"}</td></tr>`).join("");
-  const intRows = m.chosen.sort((a,b)=>a.wave-b.wave).map(s=>`<tr><td>${esc(s.label)}</td><td><span class="pill ${s.kind}">${s.kind==="stock"?"stock":"custom · "+s.cls}</span></td><td class="num">${s.wave}</td><td>${s.effort}</td></tr>`).join("");
+  const intRows = m.chosen.sort((a,b)=>a.wave-b.wave).map(s=>{
+    const routed = m.mcpRouted.some(r=>r.id===s.id);
+    const pill = s.kind==="stock" ? `<span class="pill stock">stock</span>` : routed ? `<span class="pill stock">via MCP portal</span>` : `<span class="pill custom">custom · ${s.cls}</span>`;
+    const effort = routed ? "0.5–1 day (portal config)" : s.effort;
+    return `<tr><td>${esc(s.label)}</td><td>${pill}</td><td class="num">${s.wave}</td><td>${effort}</td></tr>`;
+  }).join("");
   const polRows = m.pilots.map(u=>{
     const pol = u.risk==="A" ? "Read-only bindings; no approval needed" : u.risk==="B" ? "Write behind approval queue" : "External side effects — approval + simulate-first, do not pilot";
     const appr = u.risk==="A" ? "—" : (u.name.toLowerCase().match(/refund|payment|invoice|bill/) ? (c.approvers.payments||"TBD") : u.name.toLowerCase().match(/note|chart|record|filing|crm/) ? (c.approvers.records||"TBD") : (c.approvers.sends||"TBD"));
@@ -850,9 +924,25 @@ function renderDesign(){
     <p style="margin:0.6rem 0 0"><strong>~${m.totalHrs} hours/month ≈ $${fmtNum(m.totalVal)}/month</strong> of recoverable value across the pilot set (at $${m.rate}/hr loaded) — this is your anchor for pricing and for the pilot's METRICS log.</p>
   </div>
 
-  <div class="card"><h3>Integration map <span class="tag">${m.stock.length} stock · ${m.custom.length} custom gatekeepers</span></h3>
-    <div class="tbl"><table><thead><tr><th>System</th><th>Gatekeeper</th><th>Wave</th><th>Effort</th></tr></thead><tbody>${intRows || '<tr><td colspan="4" class="empty">Check systems in Discovery.</td></tr>'}</tbody></table></div>
+  <div class="card"><h3>Integration map <span class="tag">${m.stock.length} stock · ${m.mcpRouted.length} via MCP portal · ${m.customBuild.length} custom builds</span></h3>
+    <div class="tbl"><table><thead><tr><th>System</th><th>Path</th><th>Wave</th><th>Effort</th></tr></thead><tbody>${intRows || '<tr><td colspan="4" class="empty">Check systems in Discovery.</td></tr>'}</tbody></table></div>
   </div>
+
+  ${m.workflows.length ? `<div class="card"><h3>Automation — platform Workflows <span class="tag">scheduled &amp; event-triggered pilots run as deterministic Workflows</span></h3>
+    <div class="tbl"><table><thead><tr><th>Workflow</th><th>Trigger</th><th>Dept</th></tr></thead><tbody>
+    ${m.workflows.map(u=>`<tr><td style="white-space:normal">${esc(u.name)}</td><td><span class="pill ${u.cadence==="event"?"custom":"stock"}">${u.cadence==="event"?"external event / webhook":u.cadence}</span></td><td>${esc(u.dept)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="hint" style="margin:0.6rem 0 0">Built as platform Workflows: code for the predictable steps, models only where judgment adds value — reliable loops instead of prompt-and-pray.</p>
+  </div>` : ""}
+
+  ${(c.knowledge||[]).length ? `<div class="card"><h3>Knowledge &amp; retrieval plan <span class="tag">what agents know, and how it stays fresh</span></h3>
+    <div class="tbl"><table><thead><tr><th>Source</th><th>Retrieval route</th><th>Owner</th></tr></thead><tbody>
+    ${(c.knowledge||[]).map(k=>{
+      const route = k.type==="wiki" ? "Live via its gatekeeper" : k.type==="templates" ? "Document/slide templates" : k.type==="data" ? "Live gatekeeper reads (never copied)" : "R2 + AI Search — embeddings-based hybrid retrieval";
+      return `<tr><td style="white-space:normal">${esc(k.name)}</td><td style="white-space:normal">${route}</td><td>${esc(k.owner)||"TBD"}</td></tr>`;
+    }).join("")}
+    </tbody></table></div>
+  </div>` : ""}
 
   <div class="card"><h3>Policy matrix <span class="tag">what needs a human, and which human</span></h3>
     <div class="tbl"><table><thead><tr><th>Workflow</th><th>Tier</th><th>Policy</th><th>Approver</th></tr></thead><tbody>${polRows}</tbody></table></div>
@@ -872,7 +962,7 @@ function renderDesign(){
     <div class="tbl"><table><thead><tr><th>Phase</th><th>Weeks</th></tr></thead><tbody>
       <tr><td>Discovery</td><td class="num">${m.small?2:3}</td></tr>
       <tr><td>Foundation deploy (prod + staging)</td><td class="num">1</td></tr>
-      <tr><td>Integrations (${m.custom.length} custom) — knowledge curation in parallel</td><td class="num">${m.intWeeks}</td></tr>
+      <tr><td>Integrations (${m.customBuild.length} builds${m.mcpRouted.length?` + ${m.mcpRouted.length} portal`:""}) — knowledge curation in parallel</td><td class="num">${m.intWeeks}</td></tr>
       <tr><td>Pilot</td><td class="num">3</td></tr>
       <tr><td>Rollout &amp; training</td><td class="num">${Number(c.size)>100?4:3}</td></tr>
       <tr><td>Handoff</td><td class="num">2</td></tr>
@@ -1115,14 +1205,32 @@ export class HubspotGatekeeper {
     clearing: { t:"Connect eligibility/clearinghouse (custom · PHI)", b:`<ol><li>API credentials from the clearinghouse account.</li><li>Per-check logging; benefits worksheets only — no claim submission in phase one.</li></ol>`, v:`Benefits check for a test patient matches the portal's answer.` }
   };
 
+  const routes = c.mcpRoutes || {};
   SYS.filter(s => c.systems.includes(s.id)).sort((a,b)=>a.wave-b.wave).forEach(s => {
+    if (s.kind === "custom" && routes[s.id]) {
+      steps.push({ id:"mcp-"+s.id, title:`Connect ${s.label.split(" (")[0]} via MCP Server Portal`,
+        body:`<p>This system is routed through the vendor's remote MCP server — configuration, not code.</p>
+        <ol>
+          <li>Confirm the vendor's official MCP server URL and auth method in their developer docs (re-verify at build time; tool surfaces change).</li>
+          <li>Zero Trust dashboard → <strong>AI controls → MCP servers</strong> → add the server; complete its auth flow with a client-owned account.</li>
+          <li>Add it to the deployment's <strong>Portal</strong>; scope which tools each user group may call — start read-only tools only.</li>
+          <li>Policy check: if this system needs your own approval semantics on writes, ethical walls, or minimum-necessary scoping, take it off the portal route (Discovery → systems card) and build the gatekeeper instead.</li>
+        </ol>`,
+        verify:`A pilot user's agent can call an allowed tool; disallowed tools are absent; the call appears in the portal's logs.` });
+      return;
+    }
     const d = sysSteps[s.id]; if (!d) return;
     steps.push({ id:"sys-"+s.id, title:d.t, body:d.b, code:d.code, body2:d.body2, verify:d.v });
   });
 
+  const kn = c.knowledge || [];
+  const knHtml = kn.length ? `<ul>${kn.map(k=>{
+    const route = k.type==="wiki" ? "connect live via its gatekeeper" : k.type==="templates" ? "load as document/slide templates" : k.type==="data" ? "leave in-system; agents read live through gatekeepers" : "ingest to R2 + AI Search (hybrid retrieval)";
+    return `<li><strong>${esc(k.name)}</strong> (owner: ${esc(k.owner)||"TBD"}) → ${route}</li>`;
+  }).join("")}</ul>` : `<p class="hint">(no sources inventoried yet — capture them in Discovery's knowledge card)</p>`;
   steps.push({ id:"knowledge", title:"Load knowledge & skills",
     body:`<ol>
-      <li>Collect the SOP corpus (Section 05 checklist of the playbook) into an R2-backed knowledge source; connect the wiki via its gatekeeper.</li>
+      <li>Route each inventoried knowledge source (owners chase their own): ${knHtml}</li>
       <li>Write the first 10–15 skills files (<code>.agents/skills/</code>) — one per pilot workflow, in the client's vocabulary. Start each from your vertical kit and edit with the champion beside you.</li>
       <li>Load the ${VERTICALS[c.vertical].label} guardrails into a standing policy skill: <em>${esc(VERTICALS[c.vertical].guard)}</em></li>
     </ol>`,
@@ -1149,6 +1257,7 @@ function renderBuild(){
   const header = `
   <h2>Phase 3 · Build Guide</h2>
   <p class="hint">Generated for <strong>${esc(c.name)}</strong> from the Discovery answers — hostnames, config, and per-system steps below are personalized. Follow top to bottom; each step says how to verify it worked. Change Discovery, and this guide regenerates.</p>
+  <div class="note" style="max-width:52rem"><b>How this connects to your Cloudflare account:</b> this Studio never touches it — it only generates the config and commands. The connection happens in step 1: <code>wrangler login</code> signs your machine into the account via your browser, and <code>pnpm deploy</code> pushes the workspace there. When the guide completes, Cloudflare OS is a website at your hostname behind Access — that's where you and your users log in daily. The Studio stays your planning cockpit outside it.</div>
   <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
   <p class="hint">${done} of ${steps.length} steps complete</p>
   ${(!c.domain || !c.accountId) ? `<div class="warnbox">Missing inputs: ${!c.domain?"<strong>company domain</strong> (Discovery → profile) ":""}${!c.accountId?"<strong>Account ID</strong> (step 2 below)":""} — placeholders appear in the config until filled.</div>` : ""}`;

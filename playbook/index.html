@@ -396,6 +396,7 @@ flowchart LR
     <ul>
       <li><strong>Gatekeeper library</strong> — QuickBooks Online, Stripe, HubSpot, Salesforce, Microsoft Graph (M365 mail/calendar), plus one vertical system per target industry. Each with a policy template (scopes, approval rules) and an integration test suite.</li>
       <li><strong>Skills starter kits</strong> — 10–15 skills per vertical (Section 06 lists the workflows they encode), plus a generic Codex template with the section headings every client fills in.</li>
+      <li><strong>Gadget blueprint packs</strong> — apps built once in your own OS export as <code>.gadget</code> archives and import into any client deployment (author metadata preserved, each instance gets independent storage and bindings). Curate them on each client's admin-controlled <strong>Explore page</strong>, so every deployment ships with your vertical app library pre-loaded.</li>
       <li><strong>Delivery collateral</strong> — discovery interview guide and scoring rubric (Section 04), client setup checklist (Section 05), SOW/MSA templates with IP and data-handling clauses, the security one-pager answering Section 10's FAQ, training decks for all four tracks, runbook templates.</li>
     </ul>
 
@@ -846,7 +847,7 @@ flowchart LR
     <div class="faq-item"><h4>What stops an agent from doing something it shouldn't?</h4>
       <p>Agents start with access to nothing; every capability is an explicit grant through a Gatekeeper that scopes resources, logs every read, and queues side effects (sends, payments, filings) behind named human approvers. App servers run with outbound networking disabled.</p></div>
     <div class="faq-item"><h4>Can an employee leak data by sharing a workspace or app?</h4>
-      <p>The platform records every resource an agent observed; when someone opens shared work, Gatekeepers verify <em>that person's</em> access to each observed resource first. Collaborators use their own model budgets and their own third-party connections. Share links are stored hashed and are revocable, with live sessions cut on revocation.</p></div>
+      <p>The platform records every resource an agent observed; when someone opens shared work, Gatekeepers verify <em>that person's</em> access to each observed resource — against the viewer's <em>own</em> connected accounts, re-checked on every open so revoked access is caught promptly. Collaborators use their own model budgets and their own third-party connections. Share links are stored hashed and are revocable, with live sessions cut on revocation.</p></div>
     <div class="faq-item"><h4>What's the license, and what do we own?</h4>
       <p>Cloudflare OS is Apache-2.0 — permissive open source. Your deployment config, Codex, skills, and policy are yours outright; custom Gatekeeper code ownership is set in the SOW (default: perpetual license to you, reusable core retained by us).</p></div>
     <div class="faq-item"><h4>What if Cloudflare abandons the project?</h4>

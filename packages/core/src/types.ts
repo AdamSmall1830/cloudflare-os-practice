@@ -48,9 +48,22 @@ export interface StarterUseCase {
   systems: string[];
 }
 
+/** How a workflow runs: on demand, on a schedule, or on an external event. */
+export type Cadence = "demand" | "daily" | "weekly" | "event";
+
 export interface UseCase extends StarterUseCase {
   /** Selected for the pilot charter. */
   pilot: boolean;
+  /** Execution cadence; scheduled/event cadences become platform Workflows. Default "demand". */
+  cadence?: Cadence;
+}
+
+/** One knowledge source captured in discovery. */
+export interface KnowledgeSource {
+  name: string;
+  /** sops → R2 + AI Search · wiki → its gatekeeper · templates → document templates · data → live gatekeeper reads. */
+  type: "sops" | "wiki" | "templates" | "data" | "other";
+  owner: string;
 }
 
 export interface VerticalDef {
@@ -109,7 +122,11 @@ export interface ClientRecord {
   hourlyRate: number;
   /** Selected system ids from the catalog. */
   systems: string[];
+  /** System ids routed through a vendor MCP server via an MCP Server Portal instead of a custom gatekeeper build. */
+  mcpRoutes: Record<string, boolean>;
   otherSystems: string;
+  /** Knowledge sources inventoried in discovery; drives the retrieval plan. */
+  knowledge: KnowledgeSource[];
   interviews: Interview[];
   inbox: InboxItem[];
   surveyNotes: string;
@@ -132,7 +149,14 @@ export interface DesignModel {
   client: ClientRecord;
   chosen: SystemDef[];
   stock: SystemDef[];
+  /** All custom-kind systems (mcpRouted ∪ customBuild). */
   custom: SystemDef[];
+  /** Custom-kind systems routed through an MCP Server Portal (config, not code). */
+  mcpRouted: SystemDef[];
+  /** Custom-kind systems we actually build gatekeepers for. */
+  customBuild: SystemDef[];
+  /** Pilot workflows with a scheduled/event cadence — the platform Workflows plan. */
+  workflows: ScoredUseCase[];
   ranked: ScoredUseCase[];
   /** The pilot charter: manual pilot flags if any, else auto-suggested. */
   pilots: ScoredUseCase[];

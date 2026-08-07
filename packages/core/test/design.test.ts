@@ -25,11 +25,25 @@ describe("designModel", () => {
     expect(m.custom.map((s) => s.id).sort()).toEqual(["ghl", "qbo", "stripe"]);
   });
 
-  it("compresses discovery for small orgs and scales integration weeks with custom count", () => {
-    const m = designModel(hqClient()); // size 3, 3 custom systems
+  it("compresses discovery for small orgs and scales integration weeks with the BUILD count", () => {
+    const m = designModel(hqClient()); // size 3; 3 custom systems but Stripe is MCP-routed → 2 builds
     expect(m.discoveryWeeks).toBe(2);
-    expect(m.intWeeks).toBe(5); // ceil(3 × 1.5)
-    expect(m.weeks).toBe(2 + 1 + 5 + 3 + 3 + 2);
+    expect(m.intWeeks).toBe(3); // ceil(2 × 1.5)
+    expect(m.weeks).toBe(2 + 1 + 3 + 3 + 3 + 2);
+  });
+
+  it("splits custom systems into MCP-routed and custom-build", () => {
+    const m = designModel(hqClient());
+    expect(m.mcpRouted.map((s) => s.id)).toEqual(["stripe"]);
+    expect(m.customBuild.map((s) => s.id).sort()).toEqual(["ghl", "qbo"]);
+    const unrouted = designModel({ ...hqClient(), mcpRoutes: {} });
+    expect(unrouted.mcpRouted).toHaveLength(0);
+    expect(unrouted.intWeeks).toBe(5); // all 3 back to builds → ceil(3 × 1.5)
+  });
+
+  it("collects scheduled/event pilots into the Workflows plan", () => {
+    const m = designModel(hqClient());
+    expect(m.workflows.map((u) => u.cadence).sort()).toEqual(["event", "weekly"]);
   });
 
   it("derives hostnames with a placeholder until the domain is known", () => {
@@ -45,6 +59,10 @@ describe("scopeMarkdown", () => {
     expect(md).toContain("# Our Firm — Cloudflare OS HQ — Cloudflare OS Deployment: Proposed Scope");
     expect(md).toContain("~51 hours/month ≈ $3,060/month** at a $60/hr loaded rate");
     expect(md).toContain("| GoHighLevel (CRM · funnels · booking · payments) | Custom gatekeeper (OAuth SaaS REST) | 2 | 1–2 weeks |");
+    expect(md).toContain("| Stripe | Vendor MCP server via MCP Server Portal | 2 | 0.5–1 day (portal config) |");
+    expect(md).toContain("## Automation (platform Workflows)");
+    expect(md).toContain("## Knowledge & retrieval plan");
+    expect(md).toContain("R2 + AI Search");
     expect(md).toContain("payments → Adam (Principal)");
   });
 

@@ -19,7 +19,9 @@ export function blankClient(name: string): ClientRecord {
     dailyLimit: 100,
     hourlyRate: 50,
     systems: [],
+    mcpRoutes: {},
     otherSystems: "",
+    knowledge: [],
     interviews: [],
     inbox: [],
     surveyNotes: "",
@@ -48,7 +50,13 @@ export function hqClient(): ClientRecord {
     dailyLimit: 200,
     hourlyRate: 60,
     systems: ["ghl", "google", "qbo", "stripe", "cfapi"],
+    mcpRoutes: { stripe: true }, // Stripe publishes a remote MCP server — verify current tool surface, then portal-route reads
     otherSystems: "E-signature via GoHighLevel Documents",
+    knowledge: [
+      { name: "Delivery playbook (12 sections)", type: "sops", owner: "Adam" },
+      { name: "Proposal deck + scope templates", type: "templates", owner: "Adam" },
+      { name: "GHL pipeline + engagement records", type: "data", owner: "Adam" },
+    ],
     approvers: {
       payments: "Adam (Principal)",
       sends: "Adam (Principal)",
@@ -79,6 +87,11 @@ export function hqClient(): ClientRecord {
     ],
     surveyNotes:
       "Small-team firm. Recurring themes: lead-reply drafting, proposal assembly, prerequisite chasing, and status reporting — all flowing through GoHighLevel + Google Workspace, invoiced via QBO/Stripe. Target architecture is the delivery-factory pipeline in playbook Section 12; this HQ deployment is its foundation.",
-    useCases: starters.map((s, i) => ({ ...s, systems: [...s.systems], pilot: i < 4 })),
+    useCases: starters.map((s, i) => ({
+      ...s,
+      systems: [...s.systems],
+      pilot: i < 4,
+      cadence: (["event", "demand", "demand", "weekly", "daily", "event", "weekly"] as const)[i] ?? "demand",
+    })),
   };
 }

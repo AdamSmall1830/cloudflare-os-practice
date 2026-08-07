@@ -21,7 +21,27 @@
       "stripe",
       "cfapi"
     ],
+    "mcpRoutes": {
+      "stripe": true
+    },
     "otherSystems": "E-signature via GoHighLevel Documents",
+    "knowledge": [
+      {
+        "name": "Delivery playbook (12 sections)",
+        "type": "sops",
+        "owner": "Adam"
+      },
+      {
+        "name": "Proposal deck + scope templates",
+        "type": "templates",
+        "owner": "Adam"
+      },
+      {
+        "name": "GHL pipeline + engagement records",
+        "type": "data",
+        "owner": "Adam"
+      }
+    ],
     "interviews": [
       {
         "person": "Adam",
@@ -75,7 +95,8 @@
           "ghl",
           "google"
         ],
-        "pilot": true
+        "pilot": true,
+        "cadence": "event"
       },
       {
         "name": "Synthesize discovery notes into scored use-case register",
@@ -88,7 +109,8 @@
         "systems": [
           "google"
         ],
-        "pilot": true
+        "pilot": true,
+        "cadence": "demand"
       },
       {
         "name": "Generate client proposal deck from Studio design",
@@ -102,7 +124,8 @@
           "ghl",
           "google"
         ],
-        "pilot": true
+        "pilot": true,
+        "cadence": "demand"
       },
       {
         "name": "Weekly engagement status digest to active clients",
@@ -116,7 +139,8 @@
           "ghl",
           "google"
         ],
-        "pilot": true
+        "pilot": true,
+        "cadence": "weekly"
       },
       {
         "name": "Chase client prerequisites (credentials, consents, IdP)",
@@ -130,7 +154,8 @@
           "ghl",
           "google"
         ],
-        "pilot": false
+        "pilot": false,
+        "cadence": "daily"
       },
       {
         "name": "Scaffold starter repo from signed engagement record",
@@ -143,7 +168,8 @@
         "systems": [
           "cfapi"
         ],
-        "pilot": false
+        "pilot": false,
+        "cadence": "event"
       },
       {
         "name": "Invoice + payment reconciliation GHL ↔ QBO ↔ Stripe",
@@ -158,7 +184,8 @@
           "stripe",
           "ghl"
         ],
-        "pilot": false
+        "pilot": false,
+        "cadence": "weekly"
       }
     ],
     "approvers": {

@@ -11,7 +11,6 @@ describe("generateFiles", () => {
     expect(paths).toContain("SETUP.md");
     expect(paths).toContain("packages/custom-gatekeeper/src/ghl.ts");
     expect(paths).toContain("packages/custom-gatekeeper/src/qbo.ts");
-    expect(paths).toContain("packages/custom-gatekeeper/src/stripe.ts");
     expect(paths).toContain("skills/draft-personalized-repli.md");
     expect(paths).toContain("evals/platform.json");
     expect(paths).toContain("EVALS.md");
@@ -40,14 +39,21 @@ describe("generateFiles", () => {
     expect(met.content).toContain("at $60/hr loaded");
   });
 
-  it("only scaffolds custom systems, never stock ones", () => {
+  it("only scaffolds custom BUILD systems — never stock or MCP-routed ones", () => {
     expect(paths.some((p) => p.includes("google.ts"))).toBe(false);
     expect(paths.some((p) => p.includes("cfapi.ts"))).toBe(false);
+    expect(paths.some((p) => p.includes("stripe.ts"))).toBe(false); // HQ routes Stripe via MCP portal
   });
 
   it("threads approvers into the right scaffolds", () => {
-    const stripe = files.find((f) => f.path.endsWith("stripe.ts"))!;
-    expect(stripe.content).toContain("Adam (Principal)");
+    const qbo = files.find((f) => f.path.endsWith("qbo.ts"))!;
+    expect(qbo.content).toContain("Adam (Principal)");
+  });
+
+  it("security baseline distinguishes portal-routed credentials", () => {
+    const sec = files.find((f) => f.path === "SECURITY-BASELINE.md")!;
+    expect(sec.content).toContain("| Stripe | Vendor MCP server OAuth (via MCP Server Portal)");
+    expect(sec.content).toContain("Portal configuration (Cloudflare One)");
   });
 
   it("seeds one skill per pilot use case", () => {

@@ -19,11 +19,27 @@ describe("buildSteps", () => {
       "sys-google",
       "sys-cfapi",
       "sys-qbo",
-      "sys-stripe",
+      "mcp-stripe", // HQ routes Stripe through an MCP Server Portal — config step, not a build
       "sys-ghl",
       "knowledge",
       "pilotready",
     ]);
+  });
+
+  it("MCP-routed systems get a portal step instead of a gatekeeper build", () => {
+    const step = buildSteps(hqClient()).find((s) => s.id === "mcp-stripe")!;
+    expect(step.title).toBe("Connect Stripe via MCP Server Portal");
+    expect(step.body).toContain("AI controls → MCP servers");
+    expect(step.code).toBeUndefined();
+    const unrouted = { ...hqClient(), mcpRoutes: {} };
+    expect(buildSteps(unrouted).map((s) => s.id)).toContain("sys-stripe");
+  });
+
+  it("knowledge step enumerates the inventoried sources with routing", () => {
+    const step = buildSteps(hqClient()).find((s) => s.id === "knowledge")!;
+    expect(step.body).toContain("Delivery playbook (12 sections)");
+    expect(step.body).toContain("R2 + AI Search");
+    expect(step.body).toContain("load as document/slide templates");
   });
 
   it("branches the sign-in step by idp choice", () => {
@@ -42,8 +58,8 @@ describe("buildSteps", () => {
   });
 
   it("threads approvers into gatekeeper scaffolds", () => {
-    const stripe = buildSteps(hqClient()).find((s) => s.id === "sys-stripe")!;
-    expect(stripe.code).toContain("Adam (Principal)");
+    const qbo = buildSteps(hqClient()).find((s) => s.id === "sys-qbo")!;
+    expect(qbo.code).toContain("Adam (Principal)");
   });
 });
 
