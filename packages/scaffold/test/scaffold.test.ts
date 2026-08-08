@@ -19,6 +19,11 @@ describe("generateFiles", () => {
     expect(paths).toContain("README.md");
   });
 
+  it("emits workflow specs for cadenced pilots only", () => {
+    const wf = paths.filter((p) => p.startsWith("workflows/"));
+    expect(wf.sort()).toEqual(["workflows/draft-personalized-repli.md", "workflows/weekly-engagement-status.md"]);
+  });
+
   it("emits one eval suite per pilot plus the platform suite, all valid JSON", () => {
     const evalFiles = files.filter((f) => f.path.startsWith("evals/"));
     expect(evalFiles).toHaveLength(5); // platform + 4 pilots

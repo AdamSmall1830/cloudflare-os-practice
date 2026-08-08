@@ -15,6 +15,9 @@ The delivery toolkit for our Cloudflare OS implementation business: taking clien
 | [packages/scaffold/README.md](packages/scaffold/README.md) | The `cfos-scaffold` CLI — input format and generated files |
 | [workers/ai-proxy/README.md](workers/ai-proxy/README.md) | Deploying the AI endpoint securely |
 | [docs/skills-guide.md](docs/skills-guide.md) | The craft of writing skills — anatomy, voice rules, testing against the observation log, lifecycle |
+| [docs/workflow-patterns.md](docs/workflow-patterns.md) | The five automation shapes (digest, triage, sync, chase loop, event kickoff) — structure, approval points, failure behavior, eval hooks |
+| [docs/fleet.md](docs/fleet.md) | Fleet operations — the multi-client tracker and the monthly upgrade sweep protocol |
+| [docs/training-outlines.md](docs/training-outlines.md) | Session-by-session curricula for the four training tracks (end user, champion, admin, builder) |
 | [docs/forking.md](docs/forking.md) | **Fork this repo and make it your own practice** — the full make-it-yours checklist and the honest ledger of what's included |
 
 ## Architecture

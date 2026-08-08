@@ -28,6 +28,9 @@ out/<slug>/
 ├── evals/
 │   ├── platform.json                   # universal red-team suite (all blockers)
 │   └── <use-case>.json                 # golden + approval cases per pilot workflow
+├── workflows/
+│   └── <use-case>.md                   # pattern-instantiated spec per scheduled/event pilot
+│                                       # (patterns: docs/workflow-patterns.md)
 ├── packages/custom-gatekeeper/src/
 │   ├── ghl.ts                          # one scaffold per *custom* system in the record
 │   └── …                               # (stock systems need config, not code — none emitted)
