@@ -8,6 +8,7 @@ The delivery toolkit for our Cloudflare OS implementation business: taking clien
 
 | Read this | If you want to |
 |---|---|
+| [AGENTS.md](AGENTS.md) | **Give this repo to an AI agent** — the machine-readable operating manual: mental model, ClientRecord schema, engine API, extension recipes, and the hard rules (also loaded automatically by Claude Code via CLAUDE.md) |
 | [docs/getting-started.md](docs/getting-started.md) | Set up — as an **operator** (run engagements in the Studio), a **developer** (build with the engine/CLI), or a **deployer** (host the Studio + AI endpoint) |
 | [docs/studio-guide.md](docs/studio-guide.md) | Learn the Studio's UI/UX — every tab, field, scoring rule, AI-assist mode, and data-handling behavior |
 | [playbook/index.html](playbook/index.html) | The delivery method itself — the 12-section field manual (open in a browser) |
@@ -32,8 +33,8 @@ playbook/           the client delivery playbook — single-file field manual
 
 | Piece | What it is |
 |---|---|
-| [`packages/core`](packages/core) | The engine: `ClientRecord` schema, system/vertical catalogs, use-case scoring, the design & scope generator (`designModel`, `scopeMarkdown`), the build-guide generator (`buildSteps`, `buildGuideMarkdown`, `deploymentJsonc`), AI-assist prompt + response validation (`aiPrompt`, `parseAiSuggestions`), and the HQ seed record. Pure functions, typed, tested with vitest. |
-| [`packages/scaffold`](packages/scaffold) | `cfos-scaffold <export.json>` — reads a Studio client export and emits a starter-repo seed: filled `deployment.jsonc`, per-system gatekeeper scaffolds, skill seeds, **eval suites (golden + red-team) with a run protocol**, a pilot **metrics/ROI log**, a **security baseline with incident runbook**, and a numbered `SETUP.md`. This is the "deploy a design" path for developers. |
+| [`packages/core`](packages/core) | The engine: `ClientRecord` schema, system/vertical catalogs, use-case scoring + ROI, the design & scope generator (with MCP-routing split and the Workflows plan), the build-guide generator, AI-assist prompt + response validation, **eval-suite generation**, **workflow-spec generation**, and the HQ seed record. Pure functions, typed, tested with vitest. |
+| [`packages/scaffold`](packages/scaffold) | `cfos-scaffold <export.json>` — reads a Studio client export and emits the full deployment kit: filled `deployment.jsonc`, numbered `SETUP.md`, gatekeeper scaffolds (custom builds only — MCP-routed systems become portal steps), skill seeds, **eval suites + run protocol**, **workflow specs for cadenced pilots**, the pilot **metrics/ROI log**, and the **security baseline with incident runbook**. This is the "deploy a design" path for developers. |
 | [`workers/ai-proxy`](workers/ai-proxy) | Deployable Worker for the Studio's direct-endpoint AI mode. Anthropic key in a Worker secret, CORS locked to the Studio origin, Access in front. |
 | [`studio/index.html`](studio/index.html) | **Cloudflare OS Studio** — the vendor cockpit. Discovery capture → generated Design & Scope → personalized Build Guide. Deliberately a single self-contained file (zero dependencies, runs anywhere, artifact-hostable); state in `localStorage` with JSON export/import. Preloaded with the **"Our Firm — Cloudflare OS HQ"** record. |
 | [`playbook/index.html`](playbook/index.html) | **The Client Delivery Playbook** — platform analysis, reference architecture, the 8-phase roadmap, client setup checklist, vertical playbooks, Wallets track, pricing, IT/security FAQ, and Section 12: the delivery-factory pipeline. |

@@ -2,7 +2,7 @@
   "name": "@cfos-practice/scaffold",
   "private": true,
   "version": "0.1.0",
-  "description": "CLI: turn a Studio client export (JSON) into a filled Cloudflare OS starter-repo seed — deployment.jsonc, gatekeeper scaffolds, skills seeds, and SETUP.md.",
+  "description": "CLI: turn a Studio client export (JSON) into the full Cloudflare OS deployment kit — deployment.jsonc, SETUP.md, gatekeeper scaffolds, skills, eval suites, workflow specs, metrics log, and security baseline.",
   "type": "module",
   "bin": {
     "cfos-scaffold": "./dist/cli.js"

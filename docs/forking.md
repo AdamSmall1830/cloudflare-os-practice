@@ -10,7 +10,7 @@ assumes our identity.
 git clone <your-fork-url>
 cd cloudflare-os-practice
 pnpm install
-pnpm check                                # all packages build, 28 tests pass
+pnpm check                                # all packages build, full test suite passes
 pnpm scaffold examples/hq-export.json     # CLI works end-to-end → out/…
 ```
 

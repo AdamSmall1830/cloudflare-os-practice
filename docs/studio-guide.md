@@ -37,6 +37,11 @@ Drives everything downstream — fill it first.
 ### Systems inventory
 Check everything the client runs. Each system is pre-classified **stock** (ships with Cloudflare OS — config only) or **custom** (a gatekeeper we build), which drives the integration map, effort estimates, and which per-system setup steps appear in the Build Guide. Vertical-specific systems (EMR, DMS, ERP…) appear only for their vertical.
 
+**Integration path (MCP routing):** every checked custom system gets a **"via MCP portal"** toggle. Flip it when the vendor publishes an official remote MCP server and the need is reads/breadth — the plan rewrites everywhere: portal path + portal-config effort in the integration map, the timeline counts it as config instead of build weeks, the Build Guide swaps the gatekeeper build for a portal-connection step, the scaffold skips the code stub, and the security baseline marks the credential portal-held. Keep the gatekeeper build for writes, ethical walls, PHI scoping, or on-prem reach.
+
+### Knowledge inventory
+Capture what the agents must know: each source gets a name, a type, and an owner. The type sets its retrieval route — **SOPs/documents** → ingested to R2 + AI Search (embeddings-based hybrid retrieval) · **wiki** → connected live via its gatekeeper · **templates** → document/slide templates · **live business data** → stays in-system, read through gatekeepers, never copied. Feeds the Design tab's retrieval plan, the Build Guide's knowledge step (owners chase their own sources), and the scope doc.
+
 ### Interviews
 One entry per stakeholder, answering the ten discovery questions. Answers don't score anything directly — they are raw material for the AI assist and for your own use-case writing. Partial answers are fine.
 
@@ -54,6 +59,7 @@ The heart of discovery. Each row:
 | Freq/wk × Min × People | How often × how long × how many people — multiplied out to **Hrs/mo** (× 4.33 weeks ÷ 60) |
 | Feas 1–5 | API/data feasibility: 5 = clean API and verifiable output |
 | Risk | **A** read-only · **B** write behind approval · **C** external side effects (never piloted) |
+| Cadence | **On demand** · **Daily** · **Weekly** · **Event** — scheduled/event workflows become platform Workflows (Design's Automation card + a generated spec in the scaffold kit) |
 | Pilot | Tick to hand-pick the pilot charter; leave all unticked and Design auto-suggests the top 5 |
 
 **Seed starter use cases** loads the vertical's proven winners (and auto-checks their systems) — edit the numbers to the client's reality.
@@ -71,7 +77,9 @@ Synthesizes the interviews, inbox, and survey notes into scored use-case suggest
 Generated live; nothing here is edited directly — adjust Discovery and revisit.
 
 - **Pilot charter** — your hand-picked pilots, or the auto-suggested top 5 (by value × feasibility, C-risk excluded). The **~N hours/month** total is the value anchor for pricing conversations.
-- **Integration map** — every checked system with its gatekeeper type, build wave (1 stock/comms → 2 cross-industry custom → 3 line-of-business), and effort band.
+- **Integration map** — every checked system with its path (stock · **via MCP portal** · custom build), build wave (1 stock/comms → 2 cross-industry custom → 3 line-of-business), and effort band.
+- **Automation — platform Workflows** — appears when pilots have a scheduled/event cadence: each becomes a deterministic Workflow (pattern library: `docs/workflow-patterns.md`).
+- **Knowledge & retrieval plan** — appears when knowledge sources are inventoried: each source with its retrieval route and owner.
 - **Policy matrix** — each pilot workflow's risk tier mapped to its policy ("read-only", "write behind approval queue") and its named approver, plus the vertical's standing guardrails.
 - **Model matrix & budgets** — task-class → model-tier routing with the daily allowance and budget controls.
 - **Timeline** — computed from company size and custom-gatekeeper count (discovery compresses ≤30 employees; integration weeks scale at ~1.5×custom count).
@@ -79,7 +87,7 @@ Generated live; nothing here is edited directly — adjust Discovery and revisit
 
 ## Tab 3 · Build Guide
 
-The personalized setup runbook — every step numbered, with copy-paste blocks and a **"You know it worked when"** acceptance check. Steps regenerate from the profile: hostnames, `deployment.jsonc`, env vars, OAuth redirect URIs, and one setup step per checked system (in wave order), ending at the pilot-readiness gate.
+The personalized setup runbook — every step numbered, with copy-paste blocks and a **"You know it worked when"** acceptance check. It opens with the account-connection explainer: **the Studio never touches your Cloudflare account** — `wrangler login` (step 1) makes the connection on your machine, and the finished OS is a website at your hostname behind Access. Steps regenerate from the profile: hostnames, `deployment.jsonc`, env vars, OAuth redirect URIs, and one setup step per checked system in wave order (MCP-routed systems get a portal-connection step instead of a build), ending at the pilot-readiness gate.
 
 - **Checkboxes + progress bar** track completion per client (saved like everything else).
 - **Inline fields** (Account ID, Access AUD tag) update every generated config block the moment you paste them.

@@ -6,13 +6,15 @@ side effects, so everything is trivially testable and reusable from any runtime 
 browser, a future Cloudflare OS gadget).
 
 ```
-src/types.ts        ClientRecord, UseCase, SystemDef, BuildStep, DesignModel …
+src/types.ts        ClientRecord, UseCase, SystemDef, BuildStep, DesignModel, EvalCase …
 src/catalogs.ts     SYSTEMS (gatekeeper targets), VERTICALS (+ starter use cases), INTERVIEW_QUESTIONS
-src/scoring.ts      hoursPerMonth, rankUseCases, clampNum, slug
-src/design.ts       designModel, scopeMarkdown, hostnameFor, stagingFor
+src/scoring.ts      hoursPerMonth, rankUseCases, clampNum, slug, fmtNum, effectiveRate
+src/design.ts       designModel (incl. MCP-routed vs custom-build split, Workflows plan), scopeMarkdown
 src/build-guide.ts  buildSteps, buildGuideMarkdown, deploymentJsonc, gatekeeperScaffold
 src/ai.ts           aiPrompt, parseAiSuggestions
-src/seed.ts         blankClient, hqClient (the firm's own HQ record)
+src/evals.ts        evalSuites (platform red-team + golden per pilot), evalRunMarkdown
+src/workflows.ts    workflowSpecs, workflowSpecMarkdown, suggestedPattern (docs/workflow-patterns.md)
+src/seed.ts         blankClient, hqClient (the firm's own HQ record — the main test fixture)
 ```
 
 ## Usage
@@ -61,5 +63,5 @@ The duplication ends when the Studio becomes a Cloudflare OS gadget importing th
 
 ```bash
 pnpm --filter @cfos-practice/core build
-pnpm --filter @cfos-practice/core test   # 23 tests
+pnpm --filter @cfos-practice/core test
 ```
