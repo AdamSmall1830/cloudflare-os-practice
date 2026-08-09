@@ -15,15 +15,25 @@ describe("buildSteps", () => {
       "deploy",
       "gateway",
       "brand",
+      "email",
+      "webhooks", // HQ has GHL + event-cadence workflows → webhook ingress step
       "mcpcheck",
       "sys-google",
       "sys-cfapi",
       "sys-qbo",
       "mcp-stripe", // HQ routes Stripe through an MCP Server Portal — config step, not a build
       "sys-ghl",
+      "aisearch", // HQ inventories SOP-type knowledge → AI Search instance step
       "knowledge",
       "pilotready",
     ]);
+  });
+
+  it("webhooks and aisearch steps are conditional; email is always present", () => {
+    const bare = buildSteps(blankClient("X")).map((s) => s.id);
+    expect(bare).toContain("email");
+    expect(bare).not.toContain("webhooks");
+    expect(bare).not.toContain("aisearch");
   });
 
   it("MCP-routed systems get a portal step instead of a gatekeeper build", () => {
@@ -78,7 +88,7 @@ describe("buildGuideMarkdown", () => {
   it("renders every step with numbering and acceptance checks", () => {
     const md = buildGuideMarkdown(hqClient());
     expect(md).toContain("## 1. Prepare your machine");
-    expect(md).toContain("## 17. Pilot readiness — final gate");
-    expect(md.match(/> \*\*You know it worked when:\*\*/g)).toHaveLength(17);
+    expect(md).toContain("## 20. Pilot readiness — final gate");
+    expect(md.match(/> \*\*You know it worked when:\*\*/g)).toHaveLength(20);
   });
 });

@@ -154,6 +154,32 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
   });
 
   steps.push({
+    id: "email",
+    title: "Email Routing & deliverability",
+    body: `Agents receive mail (the magic inbox, pipeline addresses) via Cloudflare, and draft outbound into the client's existing mailboxes via the mail gatekeeper — so both sides need a one-time check.
+1. Zone → **Email → Email Routing → enable** (adds the routing MX/TXT records; if the client's mail is on Google/M365, routing coexists — verify the wizard's record changes with IT before applying).
+2. Create the discovery alias (e.g. \`routine@${c.domain || "client-domain.com"}\`) and any pipeline addresses; route to a monitored mailbox or a Worker; verify destination addresses when prompted.
+3. Check the *sending* domain's SPF, DKIM, and DMARC health (their existing mail provider's records) — agent-drafted volume will ride it, and weak DMARC turns into spam-folder complaints blamed on "the AI."`,
+    verify:
+      "A test mail to the alias arrives at its destination; the domain's SPF/DKIM/DMARC all pass on a checker; IT signed off on the record changes.",
+  });
+
+  const hasEventWork = c.useCases.some((u) => u.cadence === "event") || c.systems.includes("ghl");
+  if (hasEventWork) {
+    steps.push({
+      id: "webhooks",
+      title: "Webhook ingress — don't let Access eat your events",
+      body: `Access protects the workspace hostname by requiring login on *every* path — which silently blocks inbound webhooks (payment received, document signed) that trigger event Workflows.
+1. Give webhook receivers their own path or hostname (e.g. \`hooks.${c.domain || "client-domain.com"}\` or \`${host}/hooks/*\` as a separate Worker route).
+2. In Zero Trust, add a **bypass or service-auth policy** for exactly that path — never for the workspace itself.
+3. Verify each provider's webhook **signature** in the Worker before acting (shared secret from the provider's dashboard), and design handlers idempotent (duplicate deliveries are normal).
+4. Add a **rate limiting rule** on the hook path — it is the one internet-reachable surface of the deployment.`,
+      verify:
+        "A test event from the provider fires the Workflow; an unsigned/forged request is rejected; the workspace hostname still demands login everywhere.",
+    });
+  }
+
+  steps.push({
     id: "mcpcheck",
     title: "Check for vendor MCP servers before building custom",
     body: `Cloudflare OS connects to external systems two ways: its own Gatekeepers, and **existing MCP servers** governed through **MCP Server Portals** (Cloudflare One AI controls). MCP v2 (spec 2026-07-28) made servers stateless HTTP workloads, and vendors are shipping official remote servers fast — so before each custom build below:
@@ -186,6 +212,19 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
   }
 
   const kn = c.knowledge ?? [];
+  if (kn.some((k) => k.type === "sops" || k.type === "other")) {
+    steps.push({
+      id: "aisearch",
+      title: "Stand up AI Search over the knowledge bucket",
+      body: `The document-type knowledge sources retrieve through AI Search (embeddings-based hybrid retrieval) — it must exist before the knowledge step can mean anything.
+1. Dashboard → **AI → AI Search → create an instance** (names/click-paths per the current dashboard); connect the deployment's **R2 bucket** as the data source.
+2. Accept the default embedding model unless the corpus is unusual; note the choice in the security baseline.
+3. Upload a small starter batch of SOP documents and let it index; set the re-index behavior for new uploads.
+4. Agree the corpus conventions with the client: one owner per document (from the knowledge inventory), a "current as of" line in each file, and quarterly staleness review.`,
+      verify:
+        "A workspace query answers with content that could only come from an uploaded SOP, and cites/reflects the right document.",
+    });
+  }
   const knLines = kn.length
     ? kn
         .map((k) => {

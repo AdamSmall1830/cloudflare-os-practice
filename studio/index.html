@@ -1098,6 +1098,27 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
     </ol>`,
     verify:`A non-admin pilot user sees the client's name and logo on sign-in.` });
 
+  steps.push({ id:"email", title:"Email Routing & deliverability",
+    body:`<p>Agents receive mail (the magic inbox, pipeline addresses) via Cloudflare, and draft outbound into the client's existing mailboxes via the mail gatekeeper — both sides need a one-time check.</p>
+    <ol>
+      <li>Zone → <strong>Email → Email Routing → enable</strong> (adds routing MX/TXT records; if mail is on Google/M365, routing coexists — verify the record changes with IT before applying).</li>
+      <li>Create the discovery alias (e.g. <code>routine@${esc(c.domain||"client-domain.com")}</code>) and pipeline addresses; route to a monitored mailbox or a Worker; verify destination addresses when prompted.</li>
+      <li>Check the <em>sending</em> domain's SPF, DKIM, DMARC health — agent-drafted volume rides it, and weak DMARC becomes spam-folder complaints blamed on "the AI."</li>
+    </ol>`,
+    verify:`A test mail to the alias arrives; SPF/DKIM/DMARC all pass on a checker; IT signed off on the record changes.` });
+
+  if (c.useCases.some(u => u.cadence === "event") || c.systems.includes("ghl")) {
+    steps.push({ id:"webhooks", title:"Webhook ingress — don't let Access eat your events",
+      body:`<p>Access requires login on <em>every</em> path of the workspace hostname — which silently blocks the inbound webhooks (payment received, document signed) that trigger event Workflows.</p>
+      <ol>
+        <li>Give webhook receivers their own path or hostname (e.g. <code>hooks.${esc(c.domain||"client-domain.com")}</code> or a separate Worker route).</li>
+        <li>In Zero Trust, add a <strong>bypass or service-auth policy</strong> for exactly that path — never for the workspace itself.</li>
+        <li>Verify each provider's webhook <strong>signature</strong> before acting; design handlers idempotent (duplicate deliveries are normal).</li>
+        <li>Add a <strong>rate limiting rule</strong> on the hook path — it's the one internet-reachable surface of the deployment.</li>
+      </ol>`,
+      verify:`A test event fires the Workflow; a forged request is rejected; the workspace hostname still demands login everywhere.` });
+  }
+
   steps.push({ id:"mcpcheck", title:"Check for vendor MCP servers before building custom",
     body:`<p>Cloudflare OS connects to external systems two ways: its own Gatekeepers, and <strong>existing MCP servers</strong> governed through <strong>MCP Server Portals</strong> (Cloudflare One AI controls). MCP v2 made servers stateless HTTP workloads, and vendors are shipping official remote servers fast — so before each custom build below:</p>
     <ol>
@@ -1224,6 +1245,17 @@ export class HubspotGatekeeper {
   });
 
   const kn = c.knowledge || [];
+  if (kn.some(k => k.type === "sops" || k.type === "other")) {
+    steps.push({ id:"aisearch", title:"Stand up AI Search over the knowledge bucket",
+      body:`<p>Document-type knowledge retrieves through AI Search (embeddings-based hybrid retrieval) — create it before the knowledge step can mean anything.</p>
+      <ol>
+        <li>Dashboard → <strong>AI → AI Search → create an instance</strong> (click-paths per the current dashboard); connect the deployment's <strong>R2 bucket</strong> as the data source.</li>
+        <li>Accept the default embedding model unless the corpus is unusual; note the choice in the security baseline.</li>
+        <li>Upload a starter batch of SOPs and let it index; set re-index behavior for new uploads.</li>
+        <li>Agree corpus conventions: one owner per document, a "current as of" line, quarterly staleness review.</li>
+      </ol>`,
+      verify:`A workspace query answers with content that could only come from an uploaded SOP, reflecting the right document.` });
+  }
   const knHtml = kn.length ? `<ul>${kn.map(k=>{
     const route = k.type==="wiki" ? "connect live via its gatekeeper" : k.type==="templates" ? "load as document/slide templates" : k.type==="data" ? "leave in-system; agents read live through gatekeepers" : "ingest to R2 + AI Search (hybrid retrieval)";
     return `<li><strong>${esc(k.name)}</strong> (owner: ${esc(k.owner)||"TBD"}) → ${route}</li>`;

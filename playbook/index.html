@@ -580,6 +580,9 @@ flowchart LR
         <li>DNS zone active (or subdomain delegated) for the workspace hostname + a staging hostname</li>
         <li>Scoped admin seat or API token for your deploy user (revoked at handoff)</li>
         <li>Wrangler-capable machine or CI runner agreed with IT (Node 24, pnpm 11)</li>
+        <li>Email Routing enabled on the zone + magic-inbox alias created; SPF/DKIM/DMARC health of the sending domain confirmed with IT</li>
+        <li>Webhook ingress plan where event workflows exist: dedicated hooks path/hostname with Access bypass or service auth + rate limit (never on the workspace hostname)</li>
+        <li>AI Search instance over the R2 knowledge bucket (when SOP corpora are in scope)</li>
       </ul>
     </div>
     <div class="check-group">
