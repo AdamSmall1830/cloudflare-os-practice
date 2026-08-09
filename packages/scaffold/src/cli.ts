@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { slug, type ClientRecord } from "@cfos-practice/core";
+import { blankClient, slug, type ClientRecord } from "@cfos-practice/core";
 import { generateFiles } from "./generate.js";
 
 function usage(): never {
@@ -26,6 +26,14 @@ if (oIdx >= 0) {
   if (!outDir) usage();
 }
 
+// Reject unrecognized flags rather than silently ignoring them (e.g. --out).
+const consumed = new Set([inputPath, ...(oIdx >= 0 ? [args[oIdx], args[oIdx + 1]] : [])]);
+const unknownFlag = args.find((a) => a.startsWith("-") && !consumed.has(a));
+if (unknownFlag) {
+  console.error(`Unknown option: ${unknownFlag}`);
+  usage();
+}
+
 let parsed: unknown;
 try {
   parsed = JSON.parse(readFileSync(resolve(inputPath), "utf8"));
@@ -34,11 +42,15 @@ try {
   process.exit(1);
 }
 
-const client = ((parsed as { client?: unknown }).client ?? parsed) as ClientRecord;
-if (!client || typeof client.name !== "string" || !Array.isArray(client.useCases)) {
+const raw = ((parsed as { client?: unknown }).client ?? parsed) as Partial<ClientRecord>;
+if (!raw || typeof raw.name !== "string" || !Array.isArray(raw.useCases)) {
   console.error("Input does not look like a Studio client export (missing name/useCases).");
   process.exit(1);
 }
+// Normalize through the canonical defaults so a hand-written or partial record
+// missing systems/approvers/knowledge doesn't crash the generators.
+const client: ClientRecord = { ...blankClient(raw.name), ...raw };
+client.approvers = { ...blankClient(raw.name).approvers, ...(raw.approvers ?? {}) };
 
 const root = resolve(outDir ?? join("out", slug(client.name)));
 const files = generateFiles(client);

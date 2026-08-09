@@ -65,6 +65,34 @@ describe("generateFiles", () => {
     expect(paths.filter((p) => p.startsWith("skills/"))).toHaveLength(4);
   });
 
+  it("skills come from the pilot set — every workflow spec references an emitted skill, no C-risk skill", () => {
+    // Build a record with no manual pilots so skills fall to auto-selection.
+    const c = hqClient();
+    c.useCases = c.useCases.map((u) => ({ ...u, pilot: false }));
+    c.useCases.push({ name: "wire money out", dept: "Fin", freq: 9, minutes: 90, people: 9, feas: 5, risk: "C", systems: [], pilot: false, cadence: "event" });
+    const f = generateFiles(c);
+    const skillStems = f.filter((x) => x.path.startsWith("skills/")).map((x) => x.path.replace("skills/", "").replace(".md", ""));
+    // C-risk use case must NOT get a skill
+    expect(skillStems.some((s) => s.startsWith("wire-money-out"))).toBe(false);
+    // every workflow spec's referenced skill file exists
+    for (const wf of f.filter((x) => x.path.startsWith("workflows/"))) {
+      const ref = wf.content.match(/skills\/([a-z0-9-]+)\.md/)?.[1];
+      expect(ref && skillStems.includes(ref)).toBeTruthy();
+    }
+  });
+
+  it("disambiguates colliding slugs instead of overwriting", () => {
+    const c = hqClient();
+    // two names that slug identically
+    c.useCases = [
+      { name: "Weekly engagement status digest to active clients", dept: "A", freq: 4, minutes: 30, people: 1, feas: 5, risk: "B", systems: [], pilot: true, cadence: "weekly" },
+      { name: "Weekly engagement status report for leadership team", dept: "B", freq: 4, minutes: 30, people: 1, feas: 5, risk: "B", systems: [], pilot: true, cadence: "weekly" },
+    ];
+    const skills = generateFiles(c).map((x) => x.path).filter((p) => p.startsWith("skills/"));
+    expect(new Set(skills).size).toBe(skills.length); // no duplicate paths
+    expect(skills.length).toBe(2);
+  });
+
   it("SETUP.md contains the numbered guide with acceptance checks", () => {
     const setup = files.find((f) => f.path === "SETUP.md")!;
     expect(setup.content).toContain("## 1. Prepare your machine");

@@ -1,6 +1,6 @@
 import { systemById } from "./catalogs.js";
 import { designModel } from "./design.js";
-import { slug } from "./scoring.js";
+import { approverForUseCase, slug } from "./scoring.js";
 import type { Cadence, ClientRecord, ScoredUseCase } from "./types.js";
 
 /**
@@ -29,14 +29,6 @@ export function suggestedPattern(cadence: Cadence): string {
   }
 }
 
-function approverFor(c: ClientRecord, u: Pick<ScoredUseCase, "name" | "risk">): string {
-  if (u.risk === "A") return "none (read-only)";
-  const n = u.name.toLowerCase();
-  if (/refund|payment|invoice|bill|reconcil/.test(n)) return c.approvers.payments || "TBD (payments approver)";
-  if (/note|chart|record|filing|crm/.test(n)) return c.approvers.records || "TBD (records approver)";
-  return c.approvers.sends || "TBD (sends approver)";
-}
-
 /** The spec markdown for one cadenced workflow. */
 export function workflowSpecMarkdown(c: ClientRecord, u: ScoredUseCase): string {
   const cadence = u.cadence ?? "demand";
@@ -60,7 +52,7 @@ ${trigger}
 1. TODO — draft with the champion from the skill's procedure (skills/${slug(u.name)}.md).
 
 ## Approval points
-- Side effects queue for: **${approverFor(c, u)}**
+- Side effects queue for: **${approverForUseCase(u.name, u.risk, c.approvers)}**
 - Batch vs. per-item approvals: TODO (default: batch for syncs, per-item for external sends)
 
 ## Stop & failure behavior

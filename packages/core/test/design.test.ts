@@ -17,6 +17,19 @@ describe("designModel", () => {
     expect(m.autoSuggested).toBe(true);
     expect(m.pilots).toHaveLength(5);
     expect(m.pilots.some((u) => u.risk === "C")).toBe(false);
+    expect(m.noEligiblePilots).toBe(false);
+  });
+
+  it("flags noEligiblePilots and warns in the scope doc when every use case is tier C", () => {
+    const c = blankClient("All Risk Co");
+    c.useCases = [
+      { name: "wire funds", dept: "Fin", freq: 5, minutes: 20, people: 1, feas: 4, risk: "C", systems: [], pilot: false },
+      { name: "file filing", dept: "Legal", freq: 2, minutes: 40, people: 1, feas: 3, risk: "C", systems: [], pilot: false },
+    ];
+    const m = designModel(c);
+    expect(m.pilots).toHaveLength(0);
+    expect(m.noEligiblePilots).toBe(true);
+    expect(scopeMarkdown(m, { date: "2026-08-09" })).toContain("No eligible pilot workflows");
   });
 
   it("classifies chosen systems into stock and custom", () => {

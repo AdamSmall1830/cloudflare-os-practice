@@ -1,5 +1,5 @@
 import { SYSTEMS, VERTICALS } from "./catalogs.js";
-import { effectiveRate, fmtNum, rankUseCases } from "./scoring.js";
+import { effectiveDailyLimit, effectiveRate, fmtNum, rankUseCases } from "./scoring.js";
 import type { ClientRecord, DesignModel } from "./types.js";
 
 /** Hostname for the production workspace ("os.<domain>", placeholder when unknown). */
@@ -32,6 +32,8 @@ export function designModel(client: ClientRecord): DesignModel {
   const suggested = ranked.filter((u) => u.risk !== "C").slice(0, 5);
   const autoSuggested = manual.length === 0;
   const pilots = autoSuggested ? suggested : manual;
+  // Every candidate excluded (e.g. all C-risk) — a $0 design that must be flagged, not shipped silently.
+  const noEligiblePilots = pilots.length === 0 && client.useCases.length > 0;
 
   const totalHrs = Math.round(pilots.reduce((a, u) => a + u.hrsMo, 0));
   const hourlyRate = effectiveRate(client.hourlyRate);
@@ -57,6 +59,7 @@ export function designModel(client: ClientRecord): DesignModel {
     ranked,
     pilots,
     autoSuggested,
+    noEligiblePilots,
     totalHrs,
     totalValue,
     hourlyRate,
@@ -85,7 +88,7 @@ _Prepared ${date} · ${VERTICALS[c.vertical].label} · ~${c.size || "?"} employe
 Deploy Cloudflare OS as a governed AI agent workspace in ${c.name}'s own Cloudflare account: every employee gets an agent grounded in company knowledge, with all external actions mediated by credential-holding Gatekeepers, audit logging, and human approval queues.
 
 ## Pilot workflows (${m.pilots.length})
-${m.pilots.map((u) => `- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo)} hrs/month recovered · risk tier ${u.risk}`).join("\n")}
+${m.noEligiblePilots ? "> ⚠ No eligible pilot workflows: every candidate use case is tier C (external side effects), which is never auto-piloted. Add a read-only or write-behind-approval use case, or manually pilot a de-risked version.\n" : ""}${m.pilots.map((u) => `- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo)} hrs/month recovered · risk tier ${u.risk}`).join("\n") || "- (none)"}
 
 Estimated recoverable time across pilot: **~${m.totalHrs} hours/month ≈ $${fmtNum(m.totalValue)}/month** at a $${m.hourlyRate}/hr loaded rate.
 
@@ -130,7 +133,7 @@ ${(m.client.knowledge ?? [])
 
 ## Governance
 - Sign-in: ${signIn}
-- Models: ${c.provider} via AI Gateway; ${c.dailyLimit} calls/user/day allowance; per-team budgets
+- Models: ${c.provider} via AI Gateway; ${effectiveDailyLimit(c.dailyLimit)} calls/user/day allowance; per-team budgets
 - Approvals: payments → ${c.approvers.payments || "TBD"}; outbound sends → ${c.approvers.sends || "TBD"}; records/filings → ${c.approvers.records || "TBD"}
 - Vertical guardrails: ${VERTICALS[c.vertical].guard}
 

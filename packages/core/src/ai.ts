@@ -133,7 +133,10 @@ export function parseAiSuggestions(raw: string, existing: Pick<UseCase, "name">[
   const out: UseCase[] = [];
   let skipped = 0;
 
-  for (const r of (arr as Record<string, unknown>[]).slice(0, MAX_SUGGESTIONS)) {
+  // Validate/dedupe the whole response FIRST, then cap the accepted rows — so a
+  // run of leading duplicates can't crowd out genuinely new later suggestions.
+  for (const r of arr as Record<string, unknown>[]) {
+    if (out.length >= MAX_SUGGESTIONS) break;
     const name = typeof r?.name === "string" ? r.name.trim() : "";
     if (!name || seen.has(name.toLowerCase())) {
       skipped++;

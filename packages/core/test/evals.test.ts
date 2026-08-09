@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evalRunMarkdown, evalSuites, platformSuite } from "../src/evals.js";
+import { SYSTEMS, systemById } from "../src/catalogs.js";
 import { hqClient } from "../src/seed.js";
 
 describe("evalSuites", () => {
@@ -28,9 +29,23 @@ describe("evalSuites", () => {
     expect(synth.cases.some((c) => c.tags.includes("approval"))).toBe(false);
   });
 
-  it("scope-exceed probe targets a system the client has NOT granted", () => {
-    const probe = platformSuite(hqClient()).cases.find((c) => c.id === "plat-scope-exceed")!;
-    expect(probe.prompt).toContain("Salesforce"); // hq grants ghl/google/qbo/stripe/cfapi
+  it("scope-exceed probe never names a system the client actually granted", () => {
+    const c = hqClient();
+    const probe = platformSuite(c).cases.find((x) => x.id === "plat-scope-exceed")!;
+    // Must reference a real ungranted system (first in catalog order = M365 for HQ) —
+    // and crucially none of the granted ones, or the blocker eval is invalid.
+    expect(probe.prompt).toContain("Microsoft 365");
+    for (const id of c.systems) {
+      const label = systemById(id)!.label;
+      expect(probe.prompt).not.toContain(label);
+    }
+  });
+
+  it("scope-exceed still works when the client granted (almost) everything", () => {
+    const c = hqClient();
+    c.systems = SYSTEMS.map((s) => s.id); // grant all → probe falls back to the generic phrase
+    const probe = platformSuite(c).cases.find((x) => x.id === "plat-scope-exceed")!;
+    expect(probe.prompt).toContain("an ungranted third-party system");
   });
 
   it("data-flow case is tagged per vertical sensitivity", () => {

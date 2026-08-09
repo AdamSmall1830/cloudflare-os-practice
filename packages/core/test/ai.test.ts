@@ -79,4 +79,14 @@ describe("parseAiSuggestions", () => {
     const many = JSON.stringify(Array.from({ length: 30 }, (_, i) => ({ name: `uc-${i}` })));
     expect(parseAiSuggestions(many, []).added).toBe(15);
   });
+
+  it("filters BEFORE capping, so leading duplicates don't crowd out new rows", () => {
+    // 15 dupes of an existing name, then one genuinely new row → the new row survives.
+    const rows = [
+      ...Array.from({ length: 15 }, () => ({ name: "Existing thing" })),
+      { name: "Brand new thing" },
+    ];
+    const r = parseAiSuggestions(JSON.stringify(rows), [{ name: "Existing thing" }]);
+    expect(r.useCases.map((u) => u.name)).toContain("Brand new thing");
+  });
 });

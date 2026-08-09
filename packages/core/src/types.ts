@@ -162,6 +162,8 @@ export interface DesignModel {
   pilots: ScoredUseCase[];
   /** True when pilots were auto-suggested rather than manually flagged. */
   autoSuggested: boolean;
+  /** True when use cases exist but none are pilot-eligible (all tier C). */
+  noEligiblePilots: boolean;
   /** Total recoverable hours/month across the pilot set. */
   totalHrs: number;
   /** totalHrs × hourlyRate — the dollar value anchor per month. */
