@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aiPrompt, parseAiSuggestions } from "../src/ai.js";
+import { aiCritiquePrompt, aiPrompt, parseAiSuggestions } from "../src/ai.js";
 import { hqClient } from "../src/seed.js";
 
 describe("aiPrompt", () => {
@@ -9,6 +9,27 @@ describe("aiPrompt", () => {
     expect(p).toContain("ghl = GoHighLevel");
     expect(p).toContain("Draft personalized replies to new GHL leads");
     expect(p).toContain("Respond with ONLY a JSON array");
+  });
+
+  it("carries the practice knowledge: vertical guardrail, exemplars, cadence and evidence requirements", () => {
+    const p = aiPrompt(hqClient());
+    expect(p).toContain("Practice guardrail for this vertical");
+    expect(p).toContain("Nothing reaches a prospect or client without approval");
+    expect(p).toContain("Known winning patterns in this vertical");
+    expect(p).toContain('"cadence":"demand|daily|weekly|event"');
+    expect(p).toContain("evidence: REQUIRED");
+  });
+});
+
+describe("aiCritiquePrompt", () => {
+  it("embeds the same corpus, the draft verbatim, and the skeptic rules", () => {
+    const draft = '[{"name":"Draft thing","evidence":"Q1 answer"}]';
+    const p = aiCritiquePrompt(hqClient(), draft);
+    expect(p).toContain("## Interviews");
+    expect(p).toContain(draft);
+    expect(p).toContain("DROP any use case whose evidence is missing");
+    expect(p).toContain("adjust freq/minutes/people DOWN");
+    expect(p).toContain("same schema");
   });
 });
 
@@ -38,6 +59,14 @@ describe("parseAiSuggestions", () => {
     const r = parseAiSuggestions('[{"name":"Same"},{"name":"same"}]', []);
     expect(r.added).toBe(1);
     expect(r.skipped).toBe(1);
+  });
+
+  it("accepts valid cadences and defaults invalid ones to demand", () => {
+    const r = parseAiSuggestions(
+      '[{"name":"a","cadence":"weekly"},{"name":"b","cadence":"event"},{"name":"c","cadence":"hourly"},{"name":"d"}]',
+      [],
+    );
+    expect(r.useCases.map((u) => u.cadence)).toEqual(["weekly", "event", "demand", "demand"]);
   });
 
   it("reports an error when no array is present", () => {

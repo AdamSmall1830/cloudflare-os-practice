@@ -73,9 +73,11 @@ designModel(client)        // → pilots, integration split (stock/mcpRouted/cus
 scopeMarkdown(model, {date}) // → proposal-ready markdown (pass date for deterministic output)
 buildSteps(client)         // → ordered BuildStep[] (17 for the HQ record); buildGuideMarkdown() renders SETUP.md
 deploymentJsonc(client)    // → starter-template config with real values or explicit <PASTE …> placeholders
-aiPrompt(client)           // → discovery-synthesis prompt. The model must return ONLY a JSON array:
-                           //    [{"name","dept","freq","minutes","people","feas","risk":"A|B|C","systems":["id"]}]
-parseAiSuggestions(raw, existing) // → validated use cases (fence-stripping, clamping, dedupe, unknown-id filter, 15 cap)
+aiPrompt(client)           // → pass-1 draft prompt: evidence corpus + vertical guardrail/exemplars + schema:
+                           //    [{"name","dept","freq","minutes","people","feas","risk":"A|B|C",
+                           //      "cadence":"demand|daily|weekly|event","systems":["id"],"evidence":"..."}]
+aiCritiquePrompt(client, draftJson) // → pass-2 skeptical evidence check; returns the corrected array, same schema
+parseAiSuggestions(raw, existing) // → validated use cases (fence-stripping, clamping, cadence/risk whitelists, dedupe, 15 cap)
 evalSuites(client)         // → platform red-team suite (6 blockers) + golden suites per pilot; evalRunMarkdown() = protocol
 workflowSpecs(client)      // → pattern-instantiated specs for cadenced pilots (patterns: docs/workflow-patterns.md)
 hqClient() / blankClient(name)  // seeds; hqClient() is the firm's own record and the main test fixture

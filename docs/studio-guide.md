@@ -65,10 +65,14 @@ The heart of discovery. Each row:
 **Seed starter use cases** loads the vertical's proven winners (and auto-checks their systems) — edit the numbers to the client's reality.
 
 ### AI assist
-Synthesizes the interviews, inbox, and survey notes into scored use-case suggestions. Two modes:
+Synthesizes the interviews, inbox, and survey notes into scored use-case suggestions.
 
-1. **Copy-paste (works everywhere, including the hosted artifact):** Copy AI prompt → run it in Claude → paste the JSON array back → Add suggestions. The importer strips markdown fences, clamps out-of-range numbers, drops duplicates and unknown system ids, and caps at 15 rows. Everything arrives unticked and editable — review the numbers.
-2. **Direct endpoint (self-hosted Studio only):** point it at the deployed [ai-proxy Worker](../workers/ai-proxy/README.md) and generate in place. The hosted artifact copy cannot use this mode (sandbox blocks external calls) — the app says so rather than failing silently.
+**What the model is given (the knowledge base):** every prompt embeds three layers — the engagement's own evidence corpus (interviews, inbox log, survey notes), the **practice's codified knowledge for the vertical** (the standing guardrail, the known-winning exemplar patterns, the scoring/risk/cadence definitions), and the allowed system ids. The model may propose **nothing without an evidence citation** from the corpus. Consistency of the *design itself* doesn't depend on the model at all — pilot selection, integrations, timeline, and policy are computed deterministically by the engine from the register.
+
+**Quality passes:** a second, skeptical **evidence-check pass** re-reads the draft against the corpus with instructions to drop unevidenced suggestions, tighten estimates downward, and correct risk tiers and cadences. In endpoint mode it's the "Two-pass quality" checkbox (automatic chain); in copy-paste mode it's the "Copy evidence-check prompt (pass 2)" button after you've pasted the pass-1 output. After either path, the structural validator still runs (fence-stripping, clamps, dedupe, unknown-id filter, 15-row cap), and everything lands unticked and editable — the human review is the final pass.
+
+1. **Copy-paste (works everywhere, including the hosted artifact):** Copy AI prompt → run it in Claude → paste the JSON array back → optionally run pass 2 → Add suggestions.
+2. **Direct endpoint (self-hosted Studio only):** point it at the deployed [ai-proxy Worker](../workers/ai-proxy/README.md), pick the brain (BYOK), tick two-pass, and generate in place. The hosted artifact copy cannot use this mode (sandbox blocks external calls) — the app says so rather than failing silently.
 
 ---
 

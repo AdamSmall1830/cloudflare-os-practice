@@ -689,6 +689,7 @@ function renderDiscovery(){
     <button class="primary" id="btnCopyAiPrompt">Copy AI prompt</button>
     <div class="field" style="margin-top:0.7rem"><label>Paste the model's JSON response here</label><textarea id="aiPaste" rows="4" placeholder='[{"name":"...","dept":"...","freq":5,"minutes":20,"people":2,"feas":4,"risk":"B","systems":["google"]}]'></textarea></div>
     <button id="btnAiIngest">Add suggestions from paste</button>
+    <button id="btnAiCritique" title="Quality pass: copies a skeptical evidence-check prompt containing your pasted draft — run it, then paste the corrected JSON back">Copy evidence-check prompt (pass 2)</button>
 
     <div class="ai-opt">Option 2 · Direct endpoint — only when you self-host this file</div>
     <p class="hint" style="margin-bottom:0.5rem">Point this at your own AI proxy (Deploy notes below), pick a brain, and optionally bring your own key. On the claude.ai-hosted copy of this page, browser security blocks external calls — use Option 1 there.</p>
@@ -705,6 +706,7 @@ function renderDiscovery(){
       <div class="field"><label>Base URL (OpenAI-compatible only)</label><input type="text" id="aiBaseUrl" value="${esc(db.aiBaseUrl||"")}" placeholder="https://api.groq.com/openai/v1"></div>
       <div class="field"><label>&nbsp;</label><button id="btnAiRun">Generate via endpoint</button></div>
     </div>
+    <label class="hint" style="display:flex;gap:0.45rem;align-items:center;margin:0.4rem 0 0"><input type="checkbox" id="aiTwoPass" ${db.aiTwoPass?"checked":""}> <span><strong>Two-pass quality:</strong> draft, then an automatic skeptical evidence check (2× model calls; drops unevidenced suggestions, tightens estimates)</span></label>
     <p class="hint" style="margin:0.4rem 0 0.5rem">Key custody: stored only in this browser (never in Exports), sent only to <em>your</em> endpoint per request, never stored server-side by the proxy.</p>
     <div class="warnbox" id="aiEndpointNote" style="display:none">The call was blocked or failed. If you're viewing this as a hosted claude.ai artifact, that's expected — external APIs are blocked by the page sandbox. Use Option 1 here, or self-host this file and try again. If self-hosted: check the endpoint URL, CORS headers, and that the Worker is deployed.</div>
 
@@ -786,6 +788,13 @@ function wireDiscovery(){
     if (!raw.trim()) { toast("Paste the model's JSON first"); return; }
     ingestAI(raw);
   };
+  document.getElementById("btnAiCritique").onclick = () => {
+    const raw = document.getElementById("aiPaste").value.trim();
+    if (!raw) { toast("Paste the pass-1 JSON first — the check runs on it"); return; }
+    copyText(aiCritiquePrompt(raw));
+  };
+  const tp = document.getElementById("aiTwoPass");
+  tp.onchange = () => { db.aiTwoPass = tp.checked; save(); };
   const ep = document.getElementById("aiEndpoint");
   ep.addEventListener("change", () => { db.aiEndpoint = ep.value.trim(); save(); });
   [["aiProvider","aiProvider"],["aiKey","aiKey"],["aiModel","aiModel"],["aiBaseUrl","aiBaseUrl"]].forEach(pair => {
@@ -798,42 +807,71 @@ function wireDiscovery(){
 }
 
 /* =============================== AI assist =============================== */
-function aiPrompt(){
-  const c = C();
-  const allowed = SYS.filter(s => !s.vert || s.vert === c.vertical).map(s => `${s.id} = ${s.label}`).join("\n");
+function discoveryCorpus(c){
   const ivs = c.interviews.map(iv =>
     `### ${iv.person||"?"} — ${iv.role||"?"}\n` +
     IQ.map((q,i) => iv.answers[i] ? `Q: ${q}\nA: ${iv.answers[i]}` : "").filter(Boolean).join("\n")
   ).join("\n\n") || "(no interviews captured)";
   const inbox = c.inbox.map(it => `- [${it.dept||"?"} · ~${it.freq}/wk] ${it.text}`).join("\n") || "(no inbox items)";
+  return `## Interviews\n${ivs}\n\n## Routine-work inbox log\n${inbox}\n\n## Survey / other notes\n${c.surveyNotes || "(none)"}`;
+}
+const AI_SCHEMA = `[{"name":"...","dept":"...","freq":N,"minutes":N,"people":N,"feas":N,"risk":"A|B|C","cadence":"demand|daily|weekly|event","systems":["id",...],"evidence":"short quote/pointer from the corpus"}]`;
+
+function aiPrompt(){
+  const c = C();
+  const allowed = SYS.filter(s => !s.vert || s.vert === c.vertical).map(s => `${s.id} = ${s.label}`).join("\n");
+  const v = VERTICALS[c.vertical];
+  const exemplars = v.starters.map(s=>`- ${s.name}`).join("\n") || "(none)";
   const existing = c.useCases.map(u => u.name).join("; ") || "(none)";
-  return `You are an AI-workspace deployment consultant. Below is raw discovery data from ${c.name}, a ${VERTICALS[c.vertical].label.toLowerCase()} with ~${c.size||"?"} employees. Synthesize it into candidate automation use cases for an agent workspace (Cloudflare OS) where agents read/write business systems through governed gatekeepers.
+  return `You are an AI-workspace deployment consultant. Below is raw discovery data from ${c.name}, a ${v.label.toLowerCase()} with ~${c.size || "?"} employees. Synthesize it into candidate automation use cases for an agent workspace (Cloudflare OS) where agents read/write business systems through governed gatekeepers.
 
 ## Systems in scope (use ONLY these ids in "systems")
 ${allowed}
 
-## Interviews
-${ivs}
+${discoveryCorpus(c)}
 
-## Routine-work inbox log
-${inbox}
+## Practice guardrail for this vertical (constrains what may be proposed)
+${v.guard}
 
-## Survey / other notes
-${c.surveyNotes || "(none)"}
+## Known winning patterns in this vertical (exemplars only — propose ONLY if independently evidenced above; never duplicate the registered list)
+${exemplars}
 
 ## Already-registered use cases (do NOT repeat these)
 ${existing}
 
 ## Your task
-Propose 5–12 NEW use cases. For each, estimate honestly from the data above:
+Propose 5–12 NEW use cases. For each, estimate honestly from the evidence above:
 - freq: times per week it occurs
 - minutes: minutes per occurrence today
 - people: how many people do this work
 - feas: 1–5 API/data feasibility (5 = clean API + verifiable output)
 - risk: "A" read-only, "B" writes behind human approval, "C" external side effects (emails to customers, payments, filings)
+- cadence: "demand" (run when asked) · "daily"/"weekly" (evidenced recurring digests, syncs, chase loops) · "event" (an explicit external trigger appears in the evidence)
+- evidence: REQUIRED — a short quote or pointer from the corpus above that motivated this use case. Propose nothing you cannot evidence.
 
 Respond with ONLY a JSON array, no prose, no markdown fences:
-[{"name":"...","dept":"...","freq":N,"minutes":N,"people":N,"feas":N,"risk":"A|B|C","systems":["id",...]}]`;
+${AI_SCHEMA}`;
+}
+
+function aiCritiquePrompt(draftJson){
+  const c = C();
+  return `You are performing a skeptical evidence check (pass 2) on AI-drafted automation use cases for ${c.name}. Your job is to remove invention and tighten estimates — a shorter, evidenced list beats an impressive one.
+
+## The evidence corpus (the ONLY ground truth)
+${discoveryCorpus(c)}
+
+## The draft to verify
+${draftJson}
+
+## Rules
+1. DROP any use case whose evidence is missing, vague, or not actually supported by the corpus.
+2. When in doubt, adjust freq/minutes/people DOWN to what the evidence supports.
+3. Risk tier: "A" only if purely read-only; anything writing to a system is "B"; anything reaching customers, regulators, or money externally is "C".
+4. Cadence: "event" only when an external trigger is explicit in the evidence; "daily"/"weekly" only when recurrence is evidenced; otherwise "demand".
+5. Keep "systems" ids only from the draft's own ids; correct evidence quotes if misattributed.
+
+Respond with ONLY the corrected JSON array, same schema, no prose, no markdown fences:
+${AI_SCHEMA}`;
 }
 
 function ingestAI(raw){
@@ -858,6 +896,7 @@ function ingestAI(raw){
       people: clampNum(r.people, 1, 500, 1),
       feas: clampNum(r.feas, 1, 5, 3),
       risk: ["A","B","C"].includes(r.risk) ? r.risk : "B",
+      cadence: ["daily","weekly","event"].includes(r.cadence) ? r.cadence : "demand",
       systems: Array.isArray(r.systems) ? r.systems.filter(id => okIds.has(id)) : [],
       pilot: false
     });
@@ -867,13 +906,9 @@ function ingestAI(raw){
   toast(added ? `${added} added${skipped ? `, ${skipped} skipped` : ""} — review the numbers` : "Nothing new to add");
 }
 
-async function aiViaEndpoint(){
+async function callAiEndpoint(promptText){
   const url = (db.aiEndpoint || "").trim();
-  if (!url) { toast("Set the endpoint URL first"); return; }
-  if (!/^https:\/\//.test(url)) { toast("Endpoint must be https://"); return; }
-  const btn = document.getElementById("btnAiRun");
-  btn.disabled = true; btn.textContent = "Generating…";
-  const payload = { prompt: aiPrompt() };
+  const payload = { prompt: promptText };
   const prov = db.aiProvider || "server";
   if (prov !== "server") {
     payload.provider = prov;
@@ -881,13 +916,25 @@ async function aiViaEndpoint(){
     if (db.aiModel) payload.model = db.aiModel;
     if (prov === "openai-compatible" && db.aiBaseUrl) payload.baseUrl = db.aiBaseUrl;
   }
+  const res = await fetch(url, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("json")) { const j = await res.json(); return j.text || j.completion || j.content || JSON.stringify(j); }
+  return res.text();
+}
+
+async function aiViaEndpoint(){
+  const url = (db.aiEndpoint || "").trim();
+  if (!url) { toast("Set the endpoint URL first"); return; }
+  if (!/^https:\/\//.test(url)) { toast("Endpoint must be https://"); return; }
+  const btn = document.getElementById("btnAiRun");
+  btn.disabled = true; btn.textContent = "Pass 1: drafting…";
   try {
-    const res = await fetch(url, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(payload) });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    let text;
-    const ct = res.headers.get("content-type") || "";
-    if (ct.includes("json")) { const j = await res.json(); text = j.text || j.completion || j.content || JSON.stringify(j); }
-    else text = await res.text();
+    let text = await callAiEndpoint(aiPrompt());
+    if (db.aiTwoPass) {
+      btn.textContent = "Pass 2: evidence check…";
+      text = await callAiEndpoint(aiCritiquePrompt(text));
+    }
     ingestAI(text);
   } catch(e){
     const note = document.getElementById("aiEndpointNote");
