@@ -19,6 +19,7 @@ The delivery toolkit for our Cloudflare OS implementation business: taking clien
 | [docs/workflow-patterns.md](docs/workflow-patterns.md) | The five automation shapes (digest, triage, sync, chase loop, event kickoff) — structure, approval points, failure behavior, eval hooks |
 | [docs/fleet.md](docs/fleet.md) | Fleet operations — the multi-client tracker and the monthly upgrade sweep protocol |
 | [docs/training-outlines.md](docs/training-outlines.md) | Session-by-session curricula for the four training tracks (end user, champion, admin, builder) |
+| [docs/gadget-port.md](docs/gadget-port.md) | The executable plan for porting the Studio into Cloudflare OS as a gadget — architecture mapping, the ten steps, and why the engine is already port-ready |
 | [docs/forking.md](docs/forking.md) | **Fork this repo and make it your own practice** — the full make-it-yours checklist and the honest ledger of what's included |
 
 ## Architecture
@@ -35,7 +36,8 @@ playbook/           the client delivery playbook — single-file field manual
 |---|---|
 | [`packages/core`](packages/core) | The engine: `ClientRecord` schema, system/vertical catalogs, use-case scoring + ROI, the design & scope generator (with MCP-routing split and the Workflows plan), the build-guide generator, AI-assist prompt + response validation, **eval-suite generation**, **workflow-spec generation**, and the HQ seed record. Pure functions, typed, tested with vitest. |
 | [`packages/scaffold`](packages/scaffold) | `cfos-scaffold <export.json>` — reads a Studio client export and emits the full deployment kit: filled `deployment.jsonc`, numbered `SETUP.md`, gatekeeper scaffolds (custom builds only — MCP-routed systems become portal steps), skill seeds, **eval suites + run protocol**, **workflow specs for cadenced pilots**, the pilot **metrics/ROI log**, and the **security baseline with incident runbook**. This is the "deploy a design" path for developers. |
-| [`workers/ai-proxy`](workers/ai-proxy) | Deployable Worker for the Studio's direct-endpoint AI mode. Anthropic key in a Worker secret, CORS locked to the Studio origin, Access in front. |
+| [`workers/ai-proxy`](workers/ai-proxy) | Deployable Worker for the Studio's direct-endpoint AI mode — multi-provider **BYOK** (Anthropic, OpenAI, OpenAI-compatible, Workers AI); user keys pass through per-request, never stored. |
+| [`workers/studio-service`](workers/studio-service) | The hosted multi-user Studio: serves the app + a per-identity API (record sync in KV, submissions with webhook forwarding), authenticated by **cryptographically verified Access JWTs**. Tested with vitest. |
 | [`studio/index.html`](studio/index.html) | **Cloudflare OS Studio** — the vendor cockpit. Discovery capture → generated Design & Scope → personalized Build Guide. Deliberately a single self-contained file (zero dependencies, runs anywhere, artifact-hostable); state in `localStorage` with JSON export/import. Preloaded with the **"Our Firm — Cloudflare OS HQ"** record. |
 | [`playbook/index.html`](playbook/index.html) | **The Client Delivery Playbook** — platform analysis, reference architecture, the 8-phase roadmap, client setup checklist, vertical playbooks, Wallets track, pricing, IT/security FAQ, and Section 12: the delivery-factory pipeline. |
 

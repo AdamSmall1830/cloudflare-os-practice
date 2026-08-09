@@ -35,6 +35,7 @@
   .brand svg { width:1.7rem; height:1.7rem; color:var(--ember); flex:none; }
   .brand .dot { color:var(--ember); }
   .brand small { display:block; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.16em; color:var(--ink-soft); }
+  .sync-chip { font-family:var(--mono); font-size:0.66rem; color:var(--ink-soft); border:1px solid var(--line); border-radius:99px; padding:0.15rem 0.6rem; background:var(--surface); white-space:nowrap; }
   @media (max-width: 720px) {
     .hdr { gap:0.6rem; }
     .brand { flex:1 1 100%; }
@@ -191,6 +192,7 @@
       <div>Cloudflare OS <span class="dot">Studio</span><small>Discovery → Design → Build · vendor cockpit</small></div>
     </div>
     <div class="spacer"></div>
+    <span id="syncChip" class="sync-chip" style="display:none" title="Signed-in identity and record sync status"></span>
     <select id="clientSel" aria-label="Active client"></select>
     <button id="btnNew" title="Start a new client engagement">+ New client</button>
     <button id="btnExport" title="Download this client's data as JSON (backup / move machines)">Export</button>
@@ -353,7 +355,7 @@ function load(){
   if (!d.active) { d.clients.hq = hqClient(); d.active = "hq"; }
   return d;
 }
-function save(){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(db)); syncSchedule(); }
 function C(){ return db.clients[db.active]; }
 function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function slug(s){ return (s||"client").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,24) || "client"; }
@@ -387,6 +389,74 @@ function showCopyModal(txt){
 function clampNum(v, min, max, dflt){ const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : dflt; }
 function fmtNum(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 function effectiveRate(rate){ const n = Number(rate); return Number.isFinite(n) && n > 0 ? Math.round(n) : 50; }
+
+/* =============================== sync (Studio service mode) =============================== */
+/* When hosted by workers/studio-service behind Cloudflare Access, records sync
+   per signed-in identity and a Submit button appears. Anywhere else (artifact,
+   file://, plain static host) every call below fails quietly → classic local mode. */
+var SYNC = { mode: "local", email: "", timer: null, status: "" }; // var: hoist-safe — save() fires during boot migration before this line runs
+
+function serverBlob(){ const copy = { ...db }; delete copy.aiKey; return JSON.stringify(copy); }
+
+async function syncInit(){
+  try {
+    const me = await fetch("/api/me", { headers: { accept: "application/json" } });
+    if (!me.ok) return;
+    const j = await me.json();
+    if (!j || !j.email) return;
+    SYNC.mode = "service"; SYNC.email = j.email;
+    const rec = await fetch("/api/records");
+    if (rec.ok) {
+      const remote = await rec.json();
+      if (remote && remote.clients && Object.keys(remote.clients).length) {
+        const localKey = db.aiKey;
+        db = remote;
+        if (localKey) db.aiKey = localKey;               // key custody stays on-device
+        localStorage.setItem(LS_KEY, JSON.stringify(db));
+      } else {
+        await syncPush();                                 // first device seeds the server
+      }
+    }
+    SYNC.status = "synced";
+    render(); updateSyncChip();
+  } catch(e){ /* not in service mode */ }
+}
+
+function syncSchedule(){
+  if (!SYNC || SYNC.mode !== "service") return;
+  SYNC.status = "saving…"; updateSyncChip();
+  clearTimeout(SYNC.timer);
+  SYNC.timer = setTimeout(syncPush, 1200);
+}
+
+async function syncPush(){
+  if (SYNC.mode !== "service") return;
+  try {
+    const r = await fetch("/api/records", { method: "PUT", headers: { "content-type": "application/json" }, body: serverBlob() });
+    SYNC.status = r.ok ? "synced" : "sync failed";
+  } catch(e){ SYNC.status = "offline — will retry"; }
+  updateSyncChip();
+}
+
+function updateSyncChip(){
+  if (!SYNC) return;
+  const chip = document.getElementById("syncChip");
+  if (!chip) return;
+  if (SYNC.mode !== "service") { chip.style.display = "none"; return; }
+  chip.style.display = "";
+  chip.textContent = `${SYNC.email} · ${SYNC.status}`;
+}
+
+async function syncSubmit(){
+  const btn = document.getElementById("btnSubmit");
+  if (btn) { btn.disabled = true; btn.textContent = "Submitting…"; }
+  try {
+    const r = await fetch("/api/submit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client: C() }) });
+    const j = await r.json().catch(() => null);
+    toast(r.ok ? (j && j.forwarded ? "Submitted — we've been notified and will be in touch" : "Submitted — thank you") : "Submit failed — try again");
+  } catch(e){ toast("Submit failed — check your connection"); }
+  if (btn) { btn.disabled = false; btn.textContent = "Submit to vendor"; }
+}
 
 /* =============================== header =============================== */
 function renderHeader(){
@@ -1003,6 +1073,7 @@ function renderDesign(){
 
   <div class="card"><h3>Scope document <span class="tag">markdown, ready for your proposal</span></h3>
     <button class="primary" id="btnCopyScope">Copy scope doc (Markdown)</button>
+    ${SYNC.mode === "service" ? `<button id="btnSubmit" title="Send this engagement record to the vendor for build & deployment">Submit to vendor</button>` : ""}
   </div>
 
   ${phaseNav("design")}`;
@@ -1010,6 +1081,8 @@ function renderDesign(){
 function wireDesign(){
   const b = document.getElementById("btnCopyScope");
   if (b) b.onclick = () => copyText(scopeMarkdown(designModel()));
+  const s = document.getElementById("btnSubmit");
+  if (s) s.onclick = syncSubmit;
 }
 
 /* =============================== build guide =============================== */
@@ -1574,6 +1647,8 @@ function render(){
   document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => {
     db.tab = b.dataset.goto; save(); render(); window.scrollTo(0, 0);
   });
+  updateSyncChip();
 }
 render();
+syncInit();
 </script>

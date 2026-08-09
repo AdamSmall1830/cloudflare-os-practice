@@ -1,0 +1,29 @@
+{
+  // The hosted Studio: static app + per-user record sync + submissions.
+  //
+  // Setup:
+  //   wrangler kv namespace create RECORDS        → paste the id below
+  //   set ACCESS_TEAM_DOMAIN + ACCESS_AUD from the Access application in
+  //   front of this Worker's route (REQUIRED — the API trusts Access JWTs).
+  //   Optional: wrangler secret put SUBMIT_WEBHOOK  (e.g. a GHL inbound webhook)
+  // Deploy: pnpm --filter @cfos-practice/studio-service deploy
+  "name": "cfos-studio-service",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    // Serves the single-file Studio. If your wrangler version rejects a path
+    // outside the project directory, copy ../../studio/index.html into
+    // ./public/ and point this at "./public".
+    "directory": "../../studio",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    { "binding": "RECORDS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }
+  ],
+  "vars": {
+    // Your Zero Trust team domain and the Access application's AUD tag.
+    "ACCESS_TEAM_DOMAIN": "yourteam.cloudflareaccess.com",
+    "ACCESS_AUD": "REPLACE_WITH_ACCESS_AUD_TAG"
+    // Never set DEV_ALLOW_EMAIL in production — local `wrangler dev` only.
+  }
+}

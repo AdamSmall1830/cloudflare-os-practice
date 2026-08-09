@@ -27,7 +27,8 @@ Three facts agents most often get wrong — don't:
 ```
 packages/core/        @cfos-practice/core — the canonical engine (schema, catalogs, generators). Start here.
 packages/scaffold/    cfos-scaffold CLI — ClientRecord JSON in, deployment kit out (src/generate.ts is pure).
-workers/ai-proxy/     Deployable Worker for the Studio's live-AI mode (Anthropic key in a Worker secret).
+workers/ai-proxy/     Multi-provider BYOK AI proxy (anthropic/openai/openai-compatible/workers-ai; keys pass through, never stored).
+workers/studio-service/  Hosted multi-user Studio: serves the app + per-identity record sync/submissions (verified Access JWTs, KV).
 studio/index.html     The Studio web app — single file, no build, localStorage state, embeds engine mirror.
 playbook/index.html   The delivery-method field manual (12 sections) — open in a browser.
 docs/                 Human guides: getting-started, studio-guide, skills-guide, workflow-patterns,

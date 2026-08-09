@@ -65,7 +65,19 @@ Details: [packages/core/README.md](../packages/core/README.md) · [packages/scaf
 
 A note on "Cloudflare OAuth": Cloudflare isn't a general public identity provider you can add to your own app the way you add Google — *inside deployed Cloudflare OS instances*, Cloudflare login exists as an auth gatekeeper, but for the Studio the equivalent simplicity is Access with OTP/social login. The benefit you'd want from a Cloudflare login (knowing the user's account/zone) arrives at deploy time anyway, via `wrangler login` and scoped tokens.
 
-**Current limits, stated honestly:** the Studio's records live in each user's browser (`localStorage`) — Access gives you *who may enter*, not shared server-side records. Cross-device/multi-user record sync is the "Studio service" phase (a small Worker + KV keyed by the Access identity), and the long-run home is the Cloudflare OS gadget port.
+**The Studio service (multi-user records + submissions).** For cross-device sync and a "Submit to vendor" flow, deploy [`workers/studio-service`](../workers/studio-service) instead of bare Pages — it serves the same app *and* a per-identity API:
+
+```bash
+cd workers/studio-service
+wrangler kv namespace create RECORDS        # paste the id into wrangler.jsonc
+# set ACCESS_TEAM_DOMAIN + ACCESS_AUD in wrangler.jsonc (from the Access app on this route)
+wrangler secret put SUBMIT_WEBHOOK          # optional: a GHL inbound webhook for submissions
+pnpm --filter @cfos-practice/studio-service deploy
+```
+
+The Worker **cryptographically verifies the Access JWT** (RS256 against your team's certs, aud/iss/exp checked) on every API call — it fails closed even if a route is misconfigured. When the app detects the service (`/api/me`), it shows the signed-in identity in the header, syncs records to KV (debounced; server wins on a fresh device; **BYOK keys never leave the browser**), and a **Submit to vendor** button appears on the Design tab — submissions are archived and forwarded to your webhook. On any other host, the app quietly stays in classic local-storage mode.
+
+**The long-run home** is the Cloudflare OS **gadget port** — see [gadget-port.md](gadget-port.md) for the executable plan (why the engine is already port-ready, the target architecture, and the ten steps to run against your live deployment).
 
 **The AI endpoint (BYOK, any brain).** The hosted claude.ai artifact copy of the Studio **cannot** call external APIs (its sandbox blocks all outbound requests) — its AI assist works in copy-prompt/paste-JSON mode. To unlock the direct AI endpoint mode:
 

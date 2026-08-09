@@ -1,0 +1,16 @@
+{
+  "name": "@cfos-practice/studio-service",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hosted Studio service: serves the app, syncs engagement records per Access identity (KV), and receives submissions — the multi-user phase before the Cloudflare OS gadget port.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
