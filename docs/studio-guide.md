@@ -94,6 +94,8 @@ The personalized setup runbook — every step numbered, with copy-paste blocks a
 - Missing profile inputs (domain, account ID) are flagged at the top; placeholders appear until filled.
 - PHI-touching systems (EMR, clearinghouse) carry a hard **"STOP unless BAAs are signed"** gate.
 
+**Blueprint PDF:** the buttons at the top of this tab assemble the client-ready deliverable — cover, executive summary with the hours/$ anchor, the full design (pilot charter, automation, knowledge plan, integration map, policy matrix, model matrix), the complete numbered walkthrough with code blocks and acceptance checks, and a who-does-what appendix. **Blueprint PDF (print)** opens the browser's print dialog (choose *Save as PDF*); **Download HTML** saves the same document as a standalone file.
+
 The same guide ships as `SETUP.md` when you run the export through `cfos-scaffold` — alongside the eval suites (`evals/` + `EVALS.md`), the pilot ROI log (`METRICS.md`), and the security baseline with incident runbook (`SECURITY-BASELINE.md`). One export produces the whole deployment kit.
 
 ---

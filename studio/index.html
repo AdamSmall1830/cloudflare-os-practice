@@ -170,6 +170,15 @@
   details summary { cursor:pointer; padding:0.6rem 0.9rem; font-family:var(--display); font-size:0.85rem; letter-spacing:0.03em; }
   details[open] summary { border-bottom:1px solid var(--line); }
   details .inner { padding:0.8rem 0.9rem; }
+
+  /* Blueprint document: hidden on screen, becomes the page when printing */
+  #blueprint { display:none; }
+  .bp-actions { display:flex; gap:0.6rem; flex-wrap:wrap; margin:0.8rem 0 0.4rem; }
+  @media print {
+    .app, .toast, .modal-overlay { display:none !important; }
+    #blueprint { display:block !important; }
+    body { background:#fff !important; }
+  }
 </style>
 
 <div class="app">
@@ -197,6 +206,7 @@
 
   <main id="view"></main>
 </div>
+<div id="blueprint" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status"></div>
 <input type="file" id="importFile" accept="application/json" style="display:none">
 
@@ -1303,6 +1313,11 @@ function renderBuild(){
   <h2>Phase 3 · Build Guide</h2>
   <p class="hint">Generated for <strong>${esc(c.name)}</strong> from the Discovery answers — hostnames, config, and per-system steps below are personalized. Follow top to bottom; each step says how to verify it worked. Change Discovery, and this guide regenerates.</p>
   <div class="note" style="max-width:52rem"><b>How this connects to your Cloudflare account:</b> this Studio never touches it — it only generates the config and commands. The connection happens in step 1: <code>wrangler login</code> signs your machine into the account via your browser, and <code>pnpm deploy</code> pushes the workspace there. When the guide completes, Cloudflare OS is a website at your hostname behind Access — that's where you and your users log in daily. The Studio stays your planning cockpit outside it.</div>
+  <div class="bp-actions">
+    <button class="primary" id="btnBlueprint" title="Opens your browser's print dialog — choose 'Save as PDF'">Blueprint PDF (print)</button>
+    <button id="btnBlueprintHtml" title="The same document as a standalone HTML file">Download HTML</button>
+  </div>
+  <p class="hint">The blueprint is the client-ready document: executive summary, the full design, and this walkthrough — in the print dialog choose <strong>Save as PDF</strong>.</p>
   <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
   <p class="hint">${done} of ${steps.length} steps complete</p>
   ${(!c.domain || !c.accountId) ? `<div class="warnbox">Missing inputs: ${!c.domain?"<strong>company domain</strong> (Discovery → profile) ":""}${!c.accountId?"<strong>Account ID</strong> (step 2 below)":""} — placeholders appear in the config until filled.</div>` : ""}`;
@@ -1325,7 +1340,179 @@ function wireBuild(){
   document.querySelectorAll("[data-code]").forEach(pre => { pre.textContent = steps[pre.dataset.code].code || ""; });
   document.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(steps[b.dataset.copy].code || ""));
   document.querySelectorAll("[data-step]").forEach(cb => cb.onchange = () => { c.steps[cb.dataset.step] = cb.checked; save(); render(); });
+  document.getElementById("btnBlueprint").onclick = blueprintPrint;
+  document.getElementById("btnBlueprintHtml").onclick = blueprintDownload;
   document.querySelectorAll("[data-bind]").forEach(el => el.addEventListener("change", () => { c[el.dataset.bind] = el.value.trim(); save(); render(); }));
+}
+
+/* =============================== blueprint (PDF via print) =============================== */
+const BP_FONT_D = 'Futura,"Century Gothic","Avenir Next","Segoe UI",sans-serif';
+const BP_CSS = `
+/* ---- Blueprint layout engine: fixed light palette, print-first, overflow-proof ---- */
+#blueprint{font-family:"Avenir Next",Avenir,Seravek,"Segoe UI",sans-serif;color:#211D18;background:#fff;max-width:52rem;margin:0 auto;padding:1.5rem;line-height:1.55;font-size:10.5pt;
+  overflow-wrap:break-word;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#blueprint *{box-sizing:border-box;max-width:100%}
+#blueprint .bp-eyebrow{font-family:${BP_FONT_D};text-transform:uppercase;letter-spacing:.18em;font-size:8pt;color:#D14E00;margin:0}
+#blueprint h1{font-family:${BP_FONT_D};font-size:23pt;line-height:1.12;margin:.2rem 0 .4rem;text-wrap:balance;overflow-wrap:anywhere}
+#blueprint .bp-meta{color:#5C554C;font-size:9.5pt;margin:0 0 1rem;overflow-wrap:anywhere}
+#blueprint h2{font-family:${BP_FONT_D};font-size:14pt;border-bottom:2px solid #211D18;padding-bottom:4px;margin:1.4rem 0 .7rem;
+  page-break-after:avoid;break-after:avoid-page}
+#blueprint h3{font-family:${BP_FONT_D};font-size:10.5pt;letter-spacing:.02em;margin:.9rem 0 .35rem;page-break-after:avoid;break-after:avoid-page}
+#blueprint p{margin:0 0 .55rem}
+#blueprint a{color:#D14E00;word-break:break-all}
+#blueprint strong{color:#211D18}
+#blueprint ol,#blueprint ul{padding-left:1.15rem;margin:.3rem 0 .55rem}
+#blueprint li{margin-bottom:3px}
+#blueprint li::marker{color:#D14E00}
+#blueprint code{font-family:"SF Mono",Consolas,monospace;font-size:8.5pt;background:#F6F5F2;border:1px solid #DDD8D0;padding:1px 4px;border-radius:3px;overflow-wrap:anywhere}
+/* sections: each major part starts a fresh page; nothing straddles awkwardly */
+#blueprint .bp-break{page-break-before:always;break-before:page}
+/* tables: zebra for scan, rows never split across pages, cells wrap anything */
+#blueprint table{border-collapse:collapse;width:100%;min-width:0;table-layout:auto;background:#fff;font-size:9pt;margin:.4rem 0 .9rem}
+#blueprint thead{display:table-header-group}
+#blueprint tr{page-break-inside:avoid;break-inside:avoid}
+#blueprint th{font-family:${BP_FONT_D};font-size:7.5pt;color:#5C554C;text-transform:uppercase;letter-spacing:.09em;text-align:left;border-bottom:2px solid #211D18;padding:4px 8px;white-space:normal}
+#blueprint td{border-bottom:1px solid #E4E0D9;color:#211D18;padding:4px 8px;vertical-align:top;overflow-wrap:anywhere;white-space:normal;font-weight:400}
+#blueprint td:first-child{font-weight:600}
+#blueprint tbody tr:nth-child(even) td{background:#FAF9F6}
+/* stats band: wraps on narrow pages / large values instead of squeezing */
+#blueprint .bp-stats{display:flex;flex-wrap:wrap;border:1px solid #DDD8D0;border-radius:6px;overflow:hidden;margin:.7rem 0 .3rem;page-break-inside:avoid;break-inside:avoid}
+#blueprint .bp-stat{flex:1 1 110pt;min-width:100pt;padding:7px 10px;border-right:1px solid #DDD8D0;border-top:1px solid #DDD8D0;margin-top:-1px}
+#blueprint .bp-stat:last-child{border-right:none}
+#blueprint .bp-stat b{display:block;font-size:14pt;font-family:${BP_FONT_D};overflow-wrap:anywhere}
+#blueprint .bp-stat span{font-size:6.8pt;text-transform:uppercase;letter-spacing:.07em;color:#5C554C}
+/* steps: a step never splits; number chips match the app's visual language */
+#blueprint .bp-step{page-break-inside:avoid;break-inside:avoid;border-top:1px solid #E4E0D9;padding:.6rem 0 .35rem;margin-top:.35rem}
+#blueprint .bp-step h3{display:flex;align-items:baseline;gap:.5rem}
+#blueprint .bp-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;height:1.5rem;border:2px solid #D14E00;color:#D14E00;font-size:9pt;flex:none;border-radius:4px;padding:0 3px}
+#blueprint .bp-code{font-family:"SF Mono",Consolas,monospace;font-size:8.3pt;line-height:1.45;background:#F6F5F2;border:1px solid #DDD8D0;padding:8px 10px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;border-radius:6px;margin:.4rem 0;page-break-inside:avoid;break-inside:avoid}
+#blueprint .bp-verify{border-left:3px solid #3E7A4E;background:#F0F5F1;padding:5px 10px;font-size:9pt;margin:.4rem 0;border-radius:0 4px 4px 0;page-break-inside:avoid;break-inside:avoid}
+#blueprint .bp-verify b{color:#3E7A4E;font-size:6.8pt;text-transform:uppercase;letter-spacing:.1em;display:block}
+#blueprint .note{border-left:3px solid #44607A;background:#EFF3F7;padding:5px 10px;font-size:9pt;margin:.5rem 0;border-radius:0 4px 4px 0;page-break-inside:avoid;break-inside:avoid}
+#blueprint .note b{color:#44607A}
+#blueprint .warnbox{border-left:3px solid #9A6B12;background:#F7EEDB;padding:5px 10px;font-size:9pt;margin:.5rem 0;border-radius:0 4px 4px 0;page-break-inside:avoid;break-inside:avoid}
+#blueprint .hint{color:#5C554C;font-size:9pt}
+#blueprint .bp-field{font-family:"SF Mono",Consolas,monospace;font-size:8.5pt;background:#F6F5F2;border:1px dashed #B8B2A8;border-radius:4px;padding:1px 8px;color:#211D18;overflow-wrap:anywhere}
+#blueprint .bp-foot{margin-top:1.3rem;border-top:2px solid #211D18;padding-top:.5rem;font-size:8.5pt;color:#5C554C;overflow-wrap:anywhere}
+@page{margin:14mm}
+`;
+(function(){ const st = document.createElement("style"); st.textContent = BP_CSS; document.head.appendChild(st); })();
+
+function blueprintBuild(){
+  const c = C();
+  const m = designModel();
+  const steps = buildSteps();
+  const date = new Date().toLocaleDateString();
+  const host = hostnameFor(c);
+  const codes = [];
+  const pilotRows = m.pilots.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.dept)}</td><td>${Math.round(u.hrsMo)}</td><td>${u.risk}</td><td>${esc(u.cadence||"demand")}</td></tr>`).join("")
+    || `<tr><td colspan="5">No pilot workflows selected yet — add use cases in Discovery and tick Pilot (or leave unticked for auto-suggestion).</td></tr>`;
+  const intRows = m.chosen.slice().sort((a,b)=>a.wave-b.wave).map(s=>{
+    const routed = m.mcpRouted.some(r=>r.id===s.id);
+    const path = s.kind==="stock" ? "Stock gatekeeper" : routed ? "Vendor MCP server via Portal" : "Custom gatekeeper ("+s.cls+")";
+    return `<tr><td>${esc(s.label)}</td><td>${path}</td><td>${s.wave}</td><td>${routed?"0.5–1 day (portal config)":s.effort}</td></tr>`;
+  }).join("") || `<tr><td colspan="4">No systems selected yet — check them in Discovery's systems inventory.</td></tr>`;
+  const polRows = m.pilots.map(u=>{
+    const pol = u.risk==="A" ? "Read-only; no approval needed" : u.risk==="B" ? "Write behind approval queue" : "External side effects — approval + simulate-first";
+    const appr = u.risk==="A" ? "—" : (u.name.toLowerCase().match(/refund|payment|invoice|bill|reconcil/) ? (c.approvers.payments||"TBD") : u.name.toLowerCase().match(/note|chart|record|filing|crm/) ? (c.approvers.records||"TBD") : (c.approvers.sends||"TBD"));
+    return `<tr><td>${esc(u.name)}</td><td>${u.risk}</td><td>${pol}</td><td>${esc(appr)}</td></tr>`;
+  }).join("");
+  const wfRows = m.workflows.map(u=>`<tr><td>${esc(u.name)}</td><td>${u.cadence==="event"?"external event / webhook":esc(u.cadence)}</td><td>${esc(u.dept)}</td></tr>`).join("");
+  const knRows = (c.knowledge||[]).map(k=>{
+    const route = k.type==="wiki" ? "Live via its gatekeeper" : k.type==="templates" ? "Document/slide templates" : k.type==="data" ? "Live gatekeeper reads (never copied)" : "R2 + AI Search (hybrid retrieval)";
+    return `<tr><td>${esc(k.name)}</td><td>${route}</td><td>${esc(k.owner)||"TBD"}</td></tr>`;
+  }).join("");
+  const stepsHtml = steps.map((s,i)=>{
+    let codeHtml = "";
+    if (s.code !== undefined) { codes.push(s.code); codeHtml = `<pre class="bp-code" data-bpcode="${codes.length-1}"></pre>`; }
+    return `<div class="bp-step"><h3><span class="bp-num">${i+1}</span>${esc(s.title)}</h3>${s.body||""}${codeHtml}${s.body2||""}<div class="bp-verify"><b>You know it worked when</b>${s.verify||""}</div></div>`;
+  }).join("");
+
+  const html = `
+  <p class="bp-eyebrow">Cloudflare OS Deployment Blueprint</p>
+  <h1>${esc(c.name)}</h1>
+  <p class="bp-meta">${esc(VERTICALS[c.vertical].label)} · ~${esc(String(c.size||"?"))} employees · https://${esc(host)} · Prepared ${esc(date)}</p>
+
+  <h2>Executive summary</h2>
+  <p>This blueprint specifies a governed AI agent workspace — Cloudflare OS — deployed in ${esc(c.name)}'s own Cloudflare account and reached at <strong>https://${esc(host)}</strong> behind single sign-on. Every employee gets an agent grounded in the company's own knowledge; every external action passes through credential-holding gatekeepers with observation logging and named-human approval queues. The design below was produced in the Studio from ${c.interviews.length} interview(s), ${c.inbox.length} routine-work sample(s), and a scored register of ${c.useCases.length} use cases.</p>
+  <div class="bp-stats">
+    <div class="bp-stat"><b>~${m.totalHrs}</b><span>hours / month recovered</span></div>
+    <div class="bp-stat"><b>$${fmtNum(m.totalVal)}</b><span>per month at $${m.rate}/hr</span></div>
+    <div class="bp-stat"><b>${m.pilots.length}</b><span>pilot workflows</span></div>
+    <div class="bp-stat"><b>${m.chosen.length}</b><span>integrations (${m.stock.length}s·${m.mcpRouted.length}p·${m.customBuild.length}b)</span></div>
+    <div class="bp-stat"><b>~${m.weeks}w</b><span>to full handoff</span></div>
+  </div>
+  <p class="hint">Integrations key: s = stock gatekeeper · p = vendor MCP server via portal · b = custom gatekeeper build.</p>
+
+  <h2 class="bp-break">Design objectives</h2>
+  <h3>Pilot charter — the workflows that prove value</h3>
+  <table><thead><tr><th>Workflow</th><th>Dept</th><th>Hrs/mo</th><th>Risk</th><th>Cadence</th></tr></thead><tbody>${pilotRows}</tbody></table>
+  <p><strong>Standing guardrail:</strong> ${esc(VERTICALS[c.vertical].guard)}</p>
+  ${wfRows ? `<h3>Automation — platform Workflows</h3><table><thead><tr><th>Workflow</th><th>Trigger</th><th>Dept</th></tr></thead><tbody>${wfRows}</tbody></table>` : ""}
+  ${knRows ? `<h3>Knowledge & retrieval plan</h3><table><thead><tr><th>Source</th><th>Retrieval route</th><th>Owner</th></tr></thead><tbody>${knRows}</tbody></table>` : ""}
+  <h3>Integration map</h3>
+  <table><thead><tr><th>System</th><th>Path</th><th>Wave</th><th>Effort</th></tr></thead><tbody>${intRows}</tbody></table>
+  <h3>Policy matrix — what needs a human, and which human</h3>
+  <table><thead><tr><th>Workflow</th><th>Tier</th><th>Policy</th><th>Approver</th></tr></thead><tbody>${polRows}</tbody></table>
+  <h3>Models & budgets</h3>
+  <table><thead><tr><th>Task class</th><th>Route to</th><th>Control</th></tr></thead><tbody>
+    <tr><td>Digests, triage, summaries</td><td>${c.provider==="workersai"?"Workers AI small models":"Fast/cheap tier"}</td><td>Default for Workflows</td></tr>
+    <tr><td>Drafting, briefs, gadget building</td><td>${c.provider==="openai"?"OpenAI mid tier":"Mid tier"}</td><td>Default for Workspaces</td></tr>
+    <tr><td>High-value judgment work</td><td>Frontier tier, explicitly selected</td><td>Per-team budget cap in AI Gateway</td></tr>
+    <tr><td>All users</td><td>—</td><td>${c.dailyLimit} calls/user/day allowance; alerts at 80% of budget</td></tr>
+  </tbody></table>
+
+  <h2 class="bp-break">The setup walkthrough — ${steps.length} steps</h2>
+  <div class="note"><b>How this connects to the Cloudflare account:</b> this document's generator never touches it. Step 1's <code>wrangler login</code> signs the deploy machine in via the browser; <code>pnpm deploy</code> pushes the workspace. When the walkthrough completes, Cloudflare OS is a website at https://${esc(host)} behind Access — that is where your team logs in daily.</div>
+  ${stepsHtml}
+
+  <h2 class="bp-break">Appendix — who does what</h2>
+  <table><thead><tr><th>Side effect class</th><th>Approver</th></tr></thead><tbody>
+    <tr><td>Payments / refunds</td><td>${esc(c.approvers.payments||"TBD")}</td></tr>
+    <tr><td>Outbound sends</td><td>${esc(c.approvers.sends||"TBD")}</td></tr>
+    <tr><td>Records / filings</td><td>${esc(c.approvers.records||"TBD")}</td></tr>
+  </tbody></table>
+  <p><strong>Only a human can do:</strong> Cloudflare/wrangler sign-in, account creation, OAuth consents and IdP configuration, BAA/DPA paperwork, approving queued side effects, and signatures. Agents draft and prepare; named people approve.</p>
+  <div class="bp-foot">Generated ${esc(date)} by Cloudflare OS Studio from the "${esc(c.name)}" engagement record · Platform click-paths verified against Cloudflare OS v2 (Aug 2026) — re-verify against the pinned release you deploy · https://${esc(host)}</div>`;
+
+  const el = document.getElementById("blueprint");
+  el.innerHTML = html;
+  el.querySelectorAll("[data-bpcode]").forEach(pre => { pre.textContent = codes[Number(pre.dataset.bpcode)]; });
+  // A document carries no form controls: swap any inherited inputs/selects/buttons
+  // from step bodies for styled value placeholders.
+  el.querySelectorAll("input, select, textarea").forEach(inp => {
+    const span = document.createElement("span");
+    span.className = "bp-field";
+    span.textContent = (inp.value || "").trim() || `⟨ ${inp.placeholder || "to be filled during setup"} ⟩`;
+    inp.replaceWith(span);
+  });
+  el.querySelectorAll("button").forEach(b => b.remove());
+  return el;
+}
+
+function blueprintPrint(){
+  blueprintBuild();
+  setTimeout(() => {
+    try { window.print(); }
+    catch(e){ toast("Printing is blocked in this frame — use Download HTML, or open the self-hosted copy"); }
+  }, 60);
+}
+
+async function blueprintDownload(){
+  const el = blueprintBuild();
+  const c = C();
+  const doc = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(c.name)} — Cloudflare OS Blueprint</title><style>${BP_CSS}#blueprint{display:block}</style></head><body><div id="blueprint">${el.innerHTML}</div></body></html>`;
+  const filename = `${slug(c.name)}-blueprint.html`;
+  if (window.claude && window.claude.downloads && window.claude.downloads.save) {
+    try { await window.claude.downloads.save({ filename, data: doc }); toast("Blueprint downloaded"); return; }
+    catch(err){
+      if (err && err.code === "declined") { toast("Download cancelled"); return; }
+      if (err && (err.code === "extension_not_enabled" || err.code === "rejected_extension")) { toast("HTML downloads unavailable here — use Blueprint PDF (print) instead"); return; }
+    }
+  }
+  const blob = new Blob([doc], { type:"text/html" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = filename; a.click(); URL.revokeObjectURL(a.href); toast("Blueprint downloaded");
 }
 
 /* =============================== render =============================== */
