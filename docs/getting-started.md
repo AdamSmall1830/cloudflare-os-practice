@@ -55,9 +55,19 @@ Details: [packages/core/README.md](../packages/core/README.md) · [packages/scaf
 
 > **Where do I make changes?** `packages/core` first — it's the tested, canonical implementation. The Studio (`studio/index.html`) embeds its own inline copy of the same logic to stay a zero-build single file; mirror behavior changes into it afterwards. This duplication is deliberate and documented in the root README; it ends when the Studio is ported to a Cloudflare OS gadget consuming `core` directly.
 
-## 3. I'm deploying — I want the AI endpoint and a hosted Studio
+## 3. I'm deploying — I want a hosted Studio with sign-in and the AI endpoint
 
-The hosted claude.ai artifact copy of the Studio **cannot** call external APIs (its sandbox blocks all outbound requests) — its AI assist works in copy-prompt/paste-JSON mode. To unlock the direct AI endpoint mode:
+**The hosting + sign-in recipe** (all Cloudflare, no app code):
+
+1. **Host:** Cloudflare Pages from this repo (no build command, output `/`) → Studio at `https://<project>.pages.dev/studio/`, or a custom hostname.
+2. **Sign-in:** put a **Cloudflare Access** self-hosted app in front of that hostname. For external users the simplest login is Access's **One-Time PIN via email** (no IdP or account needed — they enter their email, get a code); add Google/GitHub login methods alongside if you like. Allow rules by email or domain; free tier covers 50 users; every sign-in is logged.
+3. **Protect the proxy the same way** (Access on the Worker's route) so only signed-in users can spend AI calls.
+
+A note on "Cloudflare OAuth": Cloudflare isn't a general public identity provider you can add to your own app the way you add Google — *inside deployed Cloudflare OS instances*, Cloudflare login exists as an auth gatekeeper, but for the Studio the equivalent simplicity is Access with OTP/social login. The benefit you'd want from a Cloudflare login (knowing the user's account/zone) arrives at deploy time anyway, via `wrangler login` and scoped tokens.
+
+**Current limits, stated honestly:** the Studio's records live in each user's browser (`localStorage`) — Access gives you *who may enter*, not shared server-side records. Cross-device/multi-user record sync is the "Studio service" phase (a small Worker + KV keyed by the Access identity), and the long-run home is the Cloudflare OS gadget port.
+
+**The AI endpoint (BYOK, any brain).** The hosted claude.ai artifact copy of the Studio **cannot** call external APIs (its sandbox blocks all outbound requests) — its AI assist works in copy-prompt/paste-JSON mode. To unlock the direct AI endpoint mode:
 
 1. **Host the Studio on your own domain** — it's one file. Cloudflare Pages (deploy this repo, root directory) or any static host works; put Cloudflare Access in front so only your team can open it.
 2. **Deploy the AI proxy Worker** (the provider key stays in a Worker secret, never the browser):
@@ -66,7 +76,7 @@ The hosted claude.ai artifact copy of the Studio **cannot** call external APIs (
    pnpm --filter @cfos-practice/ai-proxy secret   # paste the Anthropic API key
    ```
 3. Set `ALLOWED_ORIGIN` in [`workers/ai-proxy/wrangler.jsonc`](../workers/ai-proxy/wrangler.jsonc) to your Studio hostname, and put Access in front of the Worker route too (CORS is not authentication).
-4. In the Studio: **Discovery → AI assist → Option 2**, paste the Worker URL, and "Generate via endpoint" goes live.
+4. In the Studio: **Discovery → AI assist → Option 2**, paste the Worker URL, pick the **brain** (Anthropic, OpenAI, any OpenAI-compatible endpoint via base URL, or Workers AI), and optionally paste a **bring-your-own key** — stored only in that browser, sent per-request to your proxy, never stored server-side. Leave the key blank to use the proxy's configured secrets, or choose Workers AI for a zero-key default billed to your account.
 
 Full security notes: [workers/ai-proxy/README.md](../workers/ai-proxy/README.md)
 

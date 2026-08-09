@@ -1,14 +1,20 @@
 {
   // Deploy with: pnpm --filter @cfos-practice/ai-proxy deploy
-  // Then set the secret: pnpm --filter @cfos-practice/ai-proxy secret
+  // Server-default keys (optional — BYOK requests carry their own):
+  //   wrangler secret put ANTHROPIC_API_KEY
+  //   wrangler secret put OPENAI_API_KEY
   "name": "cfos-ai-proxy",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
   "vars": {
     // Lock CORS to the origin that hosts the Studio. "*" only for local testing.
-    "ALLOWED_ORIGIN": "https://studio.yourfirm.com",
-    "MODEL": "claude-sonnet-5"
-  }
+    "ALLOWED_ORIGIN": "https://studio.yourfirm.com"
+    // Optional: force a server-default model regardless of provider defaults.
+    // "MODEL": "claude-sonnet-5"
+  },
+  // Uncomment to enable the "workers-ai" provider (no user key; billed to this account):
+  // "ai": { "binding": "AI" }
+  //
   // Recommended: put Cloudflare Access in front of this Worker's route as well —
   // CORS is not authentication.
 }

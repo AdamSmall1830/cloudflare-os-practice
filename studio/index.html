@@ -621,11 +621,21 @@ function renderDiscovery(){
     <button id="btnAiIngest">Add suggestions from paste</button>
 
     <div class="ai-opt">Option 2 · Direct endpoint — only when you self-host this file</div>
-    <p class="hint" style="margin-bottom:0.5rem">Point this at your own AI proxy (Deploy notes below). On the claude.ai-hosted copy of this page, browser security blocks external calls — use Option 1 there.</p>
+    <p class="hint" style="margin-bottom:0.5rem">Point this at your own AI proxy (Deploy notes below), pick a brain, and optionally bring your own key. On the claude.ai-hosted copy of this page, browser security blocks external calls — use Option 1 there.</p>
     <div class="grid2">
       <div class="field"><label>Endpoint URL (POST {prompt} → {text})</label><input type="text" id="aiEndpoint" value="${esc(db.aiEndpoint||"")}" placeholder="https://ai-proxy.yourfirm.com"></div>
+      <div class="field"><label>Brain (provider)</label><select id="aiProvider">
+        <option value="server" ${(db.aiProvider||"server")==="server"?"selected":""}>Server default (proxy's configured key)</option>
+        <option value="anthropic" ${db.aiProvider==="anthropic"?"selected":""}>Anthropic (Claude) — your key</option>
+        <option value="openai" ${db.aiProvider==="openai"?"selected":""}>OpenAI — your key</option>
+        <option value="openai-compatible" ${db.aiProvider==="openai-compatible"?"selected":""}>OpenAI-compatible (Groq, Mistral, local…) — your key</option>
+        <option value="workers-ai" ${db.aiProvider==="workers-ai"?"selected":""}>Workers AI (proxy account, no key)</option></select></div>
+      <div class="field"><label>Your API key <span style="text-transform:none">(BYOK — optional)</span></label><input type="password" id="aiKey" value="${esc(db.aiKey||"")}" placeholder="sk-… / stays on this device" autocomplete="off"></div>
+      <div class="field"><label>Model (blank = provider default)</label><input type="text" id="aiModel" value="${esc(db.aiModel||"")}" placeholder="e.g. claude-sonnet-5"></div>
+      <div class="field"><label>Base URL (OpenAI-compatible only)</label><input type="text" id="aiBaseUrl" value="${esc(db.aiBaseUrl||"")}" placeholder="https://api.groq.com/openai/v1"></div>
       <div class="field"><label>&nbsp;</label><button id="btnAiRun">Generate via endpoint</button></div>
     </div>
+    <p class="hint" style="margin:0.4rem 0 0.5rem">Key custody: stored only in this browser (never in Exports), sent only to <em>your</em> endpoint per request, never stored server-side by the proxy.</p>
     <div class="warnbox" id="aiEndpointNote" style="display:none">The call was blocked or failed. If you're viewing this as a hosted claude.ai artifact, that's expected — external APIs are blocked by the page sandbox. Use Option 1 here, or self-host this file and try again. If self-hosted: check the endpoint URL, CORS headers, and that the Worker is deployed.</div>
 
     <details style="margin-top:0.9rem"><summary>Deploy notes — self-hosting &amp; the AI proxy Worker</summary><div class="inner">
@@ -708,6 +718,10 @@ function wireDiscovery(){
   };
   const ep = document.getElementById("aiEndpoint");
   ep.addEventListener("change", () => { db.aiEndpoint = ep.value.trim(); save(); });
+  [["aiProvider","aiProvider"],["aiKey","aiKey"],["aiModel","aiModel"],["aiBaseUrl","aiBaseUrl"]].forEach(pair => {
+    const el2 = document.getElementById(pair[0]);
+    el2.addEventListener("change", () => { db[pair[1]] = el2.value.trim(); save(); });
+  });
   document.getElementById("btnAiRun").onclick = aiViaEndpoint;
   document.getElementById("workerSnippet").textContent = WORKER_SNIPPET;
   document.getElementById("btnCopyWorker").onclick = () => copyText(WORKER_SNIPPET);
@@ -789,8 +803,16 @@ async function aiViaEndpoint(){
   if (!/^https:\/\//.test(url)) { toast("Endpoint must be https://"); return; }
   const btn = document.getElementById("btnAiRun");
   btn.disabled = true; btn.textContent = "Generating…";
+  const payload = { prompt: aiPrompt() };
+  const prov = db.aiProvider || "server";
+  if (prov !== "server") {
+    payload.provider = prov;
+    if (db.aiKey) payload.apiKey = db.aiKey;
+    if (db.aiModel) payload.model = db.aiModel;
+    if (prov === "openai-compatible" && db.aiBaseUrl) payload.baseUrl = db.aiBaseUrl;
+  }
   try {
-    const res = await fetch(url, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ prompt: aiPrompt() }) });
+    const res = await fetch(url, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error("HTTP " + res.status);
     let text;
     const ct = res.headers.get("content-type") || "";
