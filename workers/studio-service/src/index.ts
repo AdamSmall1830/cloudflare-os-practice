@@ -20,7 +20,7 @@ export interface Env {
   ACCESS_AUD: string;
   RECORDS: {
     get(key: string, type: "text"): Promise<string | null>;
-    put(key: string, value: string): Promise<void>;
+    put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void>;
   };
   ASSETS?: { fetch(req: Request): Promise<Response> };
   SUBMIT_WEBHOOK?: string;
@@ -41,6 +41,7 @@ interface Jwk {
 
 let certCache: { fetchedAt: number; keys: Jwk[] } | null = null;
 const CERT_TTL_MS = 60 * 60 * 1000;
+const CERT_REFRESH_FLOOR_MS = 60 * 1000; // key-rotation: allow one forced refetch per minute on unknown kid
 
 function b64urlToBytes(s: string): Uint8Array {
   const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
@@ -54,8 +55,10 @@ function decodeJson(b64url: string): Record<string, unknown> {
   return JSON.parse(new TextDecoder().decode(b64urlToBytes(b64url))) as Record<string, unknown>;
 }
 
-async function getCerts(env: Env): Promise<Jwk[]> {
-  if (certCache && Date.now() - certCache.fetchedAt < CERT_TTL_MS) return certCache.keys;
+async function getCerts(env: Env, forceRefresh = false): Promise<Jwk[]> {
+  const fresh = certCache && Date.now() - certCache.fetchedAt < CERT_TTL_MS;
+  const refetchAllowed = !certCache || Date.now() - certCache.fetchedAt > CERT_REFRESH_FLOOR_MS;
+  if (certCache && fresh && !(forceRefresh && refetchAllowed)) return certCache.keys;
   const r = await fetch(`https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`);
   if (!r.ok) throw new Error(`certs fetch ${r.status}`);
   const j = (await r.json()) as { keys?: Jwk[] };
@@ -78,8 +81,12 @@ export async function verifyAccessJwt(token: string, env: Env): Promise<string |
     if (typeof payload.exp !== "number" || payload.exp * 1000 < Date.now()) return null;
     if (typeof payload.email !== "string" || !payload.email) return null;
 
-    const jwk = (await getCerts(env)).find((k) => k.kid === header.kid);
-    if (!jwk) return null;
+    let jwk = (await getCerts(env)).find((k) => k.kid === header.kid);
+    if (!jwk) {
+      // Access rotates signing keys: one forced refetch before rejecting.
+      jwk = (await getCerts(env, true)).find((k) => k.kid === header.kid);
+      if (!jwk) return null;
+    }
     const key = await crypto.subtle.importKey(
       "jwk",
       jwk as JsonWebKey,
@@ -95,10 +102,18 @@ export async function verifyAccessJwt(token: string, env: Env): Promise<string |
   }
 }
 
+/** Test hook: clears the module-level cert cache between tests. */
+export function _resetCertCacheForTests(): void {
+  certCache = null;
+}
+
 async function authenticate(req: Request, env: Env): Promise<string | null> {
   const token = req.headers.get("Cf-Access-Jwt-Assertion");
   if (token) return verifyAccessJwt(token, env);
-  if (env.DEV_ALLOW_EMAIL) return env.DEV_ALLOW_EMAIL; // wrangler dev ONLY
+  // Dev bypass is honored ONLY on loopback hosts — setting DEV_ALLOW_EMAIL on a
+  // deployed Worker must not open the API.
+  const host = new URL(req.url).hostname;
+  if (env.DEV_ALLOW_EMAIL && (host === "localhost" || host === "127.0.0.1")) return env.DEV_ALLOW_EMAIL;
   return null;
 }
 
@@ -120,6 +135,20 @@ export default {
         headers: JSON_HEADERS,
       });
     }
+
+    // CSRF defense for state-changing calls: require a same-origin JSON request.
+    // application/json is not a CORS-safelisted type, so a cross-site page can't
+    // send it without a preflight this Worker never answers permissively; the
+    // Origin check is belt-and-suspenders against a SameSite=None Access cookie.
+    if (req.method === "PUT" || req.method === "POST") {
+      const origin = req.headers.get("Origin");
+      if (origin && origin !== url.origin) {
+        return new Response(JSON.stringify({ error: "Cross-origin request refused" }), { status: 403, headers: JSON_HEADERS });
+      }
+      if (!(req.headers.get("content-type") ?? "").includes("application/json")) {
+        return new Response(JSON.stringify({ error: "content-type must be application/json" }), { status: 415, headers: JSON_HEADERS });
+      }
+    }
     const recordKey = `rec:${email.toLowerCase()}`;
 
     if (url.pathname === "/api/me" && req.method === "GET") {
@@ -133,7 +162,7 @@ export default {
 
     if (url.pathname === "/api/records" && req.method === "PUT") {
       const body = await req.text();
-      if (body.length > MAX_BLOB_BYTES) {
+      if (new TextEncoder().encode(body).length > MAX_BLOB_BYTES) {
         return new Response(JSON.stringify({ error: "Record blob too large" }), { status: 413, headers: JSON_HEADERS });
       }
       try {
@@ -151,7 +180,7 @@ export default {
 
     if (url.pathname === "/api/submit" && req.method === "POST") {
       const body = await req.text();
-      if (body.length > MAX_BLOB_BYTES) {
+      if (new TextEncoder().encode(body).length > MAX_BLOB_BYTES) {
         return new Response(JSON.stringify({ error: "Submission too large" }), { status: 413, headers: JSON_HEADERS });
       }
       let client: unknown;
@@ -165,7 +194,9 @@ export default {
         });
       }
       const submittedAt = new Date().toISOString();
-      await env.RECORDS.put(`sub:${Date.now()}:${email.toLowerCase()}`, JSON.stringify({ email, submittedAt, client }));
+      const subKey = `sub:${Date.now()}:${crypto.randomUUID().slice(0, 8)}:${email.toLowerCase()}`;
+      // 180-day retention: submissions are a hand-off queue, not permanent storage.
+      await env.RECORDS.put(subKey, JSON.stringify({ email, submittedAt, client }), { expirationTtl: 60 * 60 * 24 * 180 });
       let forwarded = false;
       if (env.SUBMIT_WEBHOOK) {
         try {

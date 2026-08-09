@@ -17,6 +17,14 @@ export interface Env {
   OPENAI_API_KEY?: string;
   ALLOWED_ORIGIN: string;
   MODEL?: string;
+  /** When set, callers must send a matching `x-proxy-secret` header. A
+   *  defense-in-depth gate for non-Access deployments; Access remains the
+   *  primary control. */
+  PROXY_SHARED_SECRET?: string;
+  /** Optional comma-separated origin allowlist for openai-compatible baseUrl
+   *  (e.g. "https://api.groq.com,https://api.mistral.ai"). Unset = any https
+   *  origin — acceptable only because Access fronts this route. */
+  COMPAT_ORIGIN_ALLOWLIST?: string;
   AI?: { run(model: string, input: unknown): Promise<{ response?: string }> };
 }
 
@@ -54,6 +62,11 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { headers: cors(env) });
     if (req.method !== "POST") return bad(headers, 405, "POST only");
 
+    // Optional shared-secret gate (fail-closed when configured).
+    if (env.PROXY_SHARED_SECRET && req.headers.get("x-proxy-secret") !== env.PROXY_SHARED_SECRET) {
+      return bad(headers, 401, "Unauthorized");
+    }
+
     let body: ProxyRequest;
     try {
       body = (await req.json()) as ProxyRequest;
@@ -65,8 +78,10 @@ export default {
     if (!prompt) return bad(headers, 400, "Missing prompt");
 
     const provider = typeof body.provider === "string" && body.provider ? body.provider : "anthropic";
+    // Per-provider default wins over env.MODEL, so a server MODEL pin can't force
+    // (e.g.) a Claude model onto an OpenAI request. env.MODEL is the last resort.
     const model =
-      (typeof body.model === "string" && body.model.trim()) || env.MODEL || DEFAULT_MODEL[provider] || "";
+      (typeof body.model === "string" && body.model.trim()) || DEFAULT_MODEL[provider] || env.MODEL || "";
     const userKey =
       (typeof body.apiKey === "string" && body.apiKey.trim()) || req.headers.get("x-user-key")?.trim() || "";
 
@@ -79,7 +94,7 @@ export default {
 
       if (provider === "anthropic") {
         const key = userKey || env.ANTHROPIC_API_KEY || "";
-        if (!key) return bad(headers, 401, "No Anthropic key: supply apiKey (BYOK) or configure the Worker secret");
+        if (!key) return bad(headers, 401, "No API key available for this provider");
         const r = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
@@ -91,16 +106,28 @@ export default {
       }
 
       if (provider === "openai" || provider === "openai-compatible") {
-        const key = userKey || env.OPENAI_API_KEY || "";
-        if (!key) return bad(headers, 401, "No key: supply apiKey (BYOK) or configure the Worker secret");
         let base = "https://api.openai.com/v1";
+        let key: string;
         if (provider === "openai-compatible") {
+          // The destination is caller-controlled, so a server secret must NEVER
+          // be attached here — otherwise an arbitrary baseUrl exfiltrates it.
           if (typeof body.baseUrl !== "string" || !/^https:\/\//.test(body.baseUrl)) {
             return bad(headers, 400, "openai-compatible requires an https baseUrl (e.g. https://api.groq.com/openai/v1)");
           }
+          if (env.COMPAT_ORIGIN_ALLOWLIST) {
+            const allowed = env.COMPAT_ORIGIN_ALLOWLIST.split(",").map((s) => s.trim());
+            if (!allowed.includes(new URL(body.baseUrl).origin)) {
+              return bad(headers, 403, "baseUrl origin is not on this proxy's allowlist");
+            }
+          }
           base = body.baseUrl.replace(/\/+$/, "");
+          key = userKey; // BYOK only — no fallback to env.OPENAI_API_KEY for custom endpoints
+          if (!key) return bad(headers, 401, "No API key available for this provider");
+        } else {
+          key = userKey || env.OPENAI_API_KEY || "";
+          if (!key) return bad(headers, 401, "No API key available for this provider");
         }
-        if (!model) return bad(headers, 400, "openai-compatible requires a model name");
+        if (!model) return bad(headers, 400, "A model name is required for this provider");
         const payload: Record<string, unknown> = { model, messages: [{ role: "user", content: prompt }] };
         if (provider === "openai-compatible") payload.max_tokens = 3000;
         const r = await fetch(`${base}/chat/completions`, {

@@ -1,5 +1,5 @@
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import worker, { type Env } from "../src/index.js";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import worker, { _resetCertCacheForTests, type Env } from "../src/index.js";
 
 /* ---------- test rig: real RS256 keys, minted JWTs, stubbed certs/KV ---------- */
 
@@ -59,11 +59,18 @@ function makeEnv(store: Map<string, string>, extra?: Partial<Env>): Env {
   };
 }
 
-async function api(env: Env, path: string, opts: { method?: string; token?: string | null; body?: string } = {}) {
+async function api(
+  env: Env,
+  path: string,
+  opts: { method?: string; token?: string | null; body?: string; origin?: string | null; contentType?: string | null } = {},
+) {
   const headers: Record<string, string> = {};
   if (opts.token) headers["Cf-Access-Jwt-Assertion"] = opts.token;
+  if (opts.origin) headers["Origin"] = opts.origin;
+  const ct = opts.contentType === undefined ? "application/json" : opts.contentType;
+  if (ct) headers["content-type"] = ct;
   const res = await worker.fetch(new Request(`https://studio.test${path}`, { method: opts.method ?? "GET", headers, body: opts.body }), env);
-  return { status: res.status, json: await res.json().catch(() => null) as Record<string, unknown> | null };
+  return { status: res.status, json: (await res.json().catch(() => null)) as Record<string, unknown> | null };
 }
 
 beforeAll(async () => {
@@ -106,9 +113,46 @@ describe("auth", () => {
     expect((await api(env, "/api/me", { token: await mint({ exp: Math.floor(Date.now() / 1000) - 10 }) })).status).toBe(401);
   });
 
-  it("DEV_ALLOW_EMAIL works only as an explicit local-dev opt-in", async () => {
-    const r = await api(makeEnv(new Map(), { DEV_ALLOW_EMAIL: "dev@local" }), "/api/me");
-    expect(r.json?.email).toBe("dev@local");
+  it("DEV_ALLOW_EMAIL works on loopback hosts only — a deployed hostname stays closed", async () => {
+    const env = makeEnv(new Map(), { DEV_ALLOW_EMAIL: "dev@local" });
+    const local = await worker.fetch(new Request("http://localhost:8787/api/me"), env);
+    expect(((await local.json()) as { email?: string }).email).toBe("dev@local");
+    const deployed = await worker.fetch(new Request("https://studio.test/api/me"), env);
+    expect(deployed.status).toBe(401); // misconfigured prod var must NOT open the API
+  });
+
+  it("refetches certs on an unknown kid after the rate floor (key rotation survives the 1h TTL)", async () => {
+    _resetCertCacheForTests();
+    let calls = 0;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const u = String(input);
+      if (u === `https://${TEAM}/cdn-cgi/access/certs`) {
+        calls++;
+        // first fetch: pre-rotation key set (missing our kid); afterwards: rotated set
+        return new Response(JSON.stringify({ keys: calls === 1 ? [] : [publicJwk] }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+      throw new Error(`unexpected fetch: ${u}`);
+    }) as typeof fetch;
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
+      const env = makeEnv(new Map());
+      // Prime the cache (pre-rotation, our kid unknown); floor blocks an instant refetch → 401
+      expect((await api(env, "/api/me", { token: await mint({}) })).status).toBe(401);
+      expect(calls).toBe(1);
+      // 2 minutes later (cache still within its 1h TTL) the same token verifies via forced refetch
+      vi.setSystemTime(new Date("2026-08-09T12:02:00Z"));
+      const r = await api(env, "/api/me", { token: await mint({}) });
+      expect(r.status).toBe(200);
+      expect(calls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+      _resetCertCacheForTests();
+      stubNetwork();
+    }
   });
 });
 
@@ -153,6 +197,20 @@ describe("submissions", () => {
   it("rejects submissions without a client record", async () => {
     const r = await api(makeEnv(new Map()), "/api/submit", { method: "POST", token: await mint({}), body: "{}" });
     expect(r.status).toBe(400);
+  });
+});
+
+describe("CSRF defense", () => {
+  it("refuses a cross-origin PUT/POST and requires application/json", async () => {
+    const env = makeEnv(new Map());
+    const token = await mint({});
+    const blob = JSON.stringify({ clients: {} });
+    // cross-origin Origin header → 403
+    expect((await api(env, "/api/records", { method: "PUT", token, body: blob, origin: "https://evil.example" })).status).toBe(403);
+    // wrong content-type → 415
+    expect((await api(env, "/api/records", { method: "PUT", token, body: blob, contentType: "text/plain" })).status).toBe(415);
+    // same-origin JSON → ok
+    expect((await api(env, "/api/records", { method: "PUT", token, body: blob, origin: "https://studio.test" })).status).toBe(200);
   });
 });
 
