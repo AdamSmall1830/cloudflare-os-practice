@@ -8,7 +8,7 @@ You are working in the **Cloudflare OS Practice** repo: the delivery toolkit a c
 Studio (web app, planning cockpit)          ← captures discovery, generates design + build guide
    │  Export → cfos-<client>.json           ← ONE data structure: the ClientRecord
    ▼
-cfos-scaffold CLI                           ← ClientRecord → 20-file deployment kit
+cfos-scaffold CLI                           ← ClientRecord → deployment kit (19 files for HQ)
    │  deployment.jsonc · SETUP.md · gatekeeper scaffolds · skills · evals · workflows · metrics · security baseline
    ▼
 cloudflare/cloudflare-os-starter (clone)    ← the kit is copied into this; pnpm deploy pushes it
@@ -71,7 +71,7 @@ Key fields and what they drive:
 ```ts
 designModel(client)        // → pilots, integration split (stock/mcpRouted/customBuild), workflows, totalHrs/totalValue, timeline
 scopeMarkdown(model, {date}) // → proposal-ready markdown (pass date for deterministic output)
-buildSteps(client)         // → ordered BuildStep[] (17 for the HQ record); buildGuideMarkdown() renders SETUP.md
+buildSteps(client)         // → ordered BuildStep[] (21 for the HQ record); buildGuideMarkdown() renders SETUP.md
 deploymentJsonc(client)    // → starter-template config with real values or explicit <PASTE …> placeholders
 aiPrompt(client)           // → pass-1 draft prompt: evidence corpus + vertical guardrail/exemplars + schema:
                            //    [{"name","dept","freq","minutes","people","feas","risk":"A|B|C",
@@ -116,4 +116,4 @@ All extensions: edit `packages/core` first → update/add tests → `pnpm check`
 
 ## Where the human docs live
 
-`README.md` (index) · `docs/getting-started.md` (operator/developer/deployer paths) · `docs/studio-guide.md` (full UI walkthrough) · `docs/skills-guide.md` · `docs/workflow-patterns.md` · `docs/fleet.md` · `docs/training-outlines.md` · `docs/forking.md` (make-it-yours) · `playbook/index.html` (the delivery method itself — pricing, verticals, the delivery-factory pipeline).
+`README.md` (index) · `docs/getting-started.md` (operator/developer/deployer paths) · `docs/studio-guide.md` (full UI walkthrough) · `docs/skills-guide.md` · `docs/workflow-patterns.md` · `docs/fleet.md` · `docs/training-outlines.md` · `docs/gadget-port.md` · `docs/forking.md` (make-it-yours) · `playbook/index.html` (the delivery method itself — pricing, verticals, the delivery-factory pipeline).

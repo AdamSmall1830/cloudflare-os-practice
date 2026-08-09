@@ -86,7 +86,7 @@ Generated live; nothing here is edited directly — adjust Discovery and revisit
 - **Knowledge & retrieval plan** — appears when knowledge sources are inventoried: each source with its retrieval route and owner.
 - **Policy matrix** — each pilot workflow's risk tier mapped to its policy ("read-only", "write behind approval queue") and its named approver, plus the vertical's standing guardrails.
 - **Model matrix & budgets** — task-class → model-tier routing with the daily allowance and budget controls.
-- **Timeline** — computed from company size and custom-gatekeeper count (discovery compresses ≤30 employees; integration weeks scale at ~1.5×custom count).
+- **Timeline** — computed from company size and custom-**build** count (discovery compresses ≤30 employees; integration weeks scale at ~1.5× the custom-gatekeeper-build count — MCP-routed systems are portal config and excluded).
 - **Copy scope doc (Markdown)** — the whole design as a proposal-ready document. Paste into your proposal or GHL document template.
 
 ## Tab 3 · Build Guide

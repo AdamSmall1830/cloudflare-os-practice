@@ -2,7 +2,7 @@
   "name": "cloudflare-os-practice",
   "private": true,
   "version": "0.1.0",
-  "description": "Delivery toolkit for a Cloudflare OS implementation practice: typed engine, scaffold CLI, AI proxy Worker, Studio cockpit, and the client delivery playbook.",
+  "description": "Delivery toolkit for a Cloudflare OS implementation practice: typed engine, scaffold CLI, BYOK AI proxy + hosted Studio-service Workers, the Studio cockpit, and the client delivery playbook.",
   "type": "module",
   "packageManager": "pnpm@9.15.9",
   "engines": {
@@ -11,7 +11,8 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "check": "pnpm -r build && pnpm -r test",
+    "check": "pnpm -r build && pnpm -r test && node scripts/check-app.mjs",
+    "check:app": "node scripts/check-app.mjs",
     "scaffold": "pnpm --filter \"@cfos-practice/scaffold...\" build && node packages/scaffold/dist/cli.js"
   }
 }

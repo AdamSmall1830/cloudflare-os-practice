@@ -27,9 +27,11 @@ The delivery toolkit for our Cloudflare OS implementation business: taking clien
 ```
 packages/core       @cfos-practice/core — the typed engine (schema, catalogs, generators)
 packages/scaffold   @cfos-practice/scaffold — CLI: Studio export JSON → starter-repo seed
-workers/ai-proxy    @cfos-practice/ai-proxy — Worker backing the Studio's AI endpoint mode
+workers/ai-proxy    @cfos-practice/ai-proxy — multi-provider BYOK AI proxy for the Studio's endpoint mode
+workers/studio-service  @cfos-practice/studio-service — hosted multi-user Studio (record sync + submissions, Access JWT auth)
 studio/             the Studio cockpit — single-file web app, zero build step
 playbook/           the client delivery playbook — single-file field manual
+scripts/check-app.mjs   CI guard for the HTML apps, the fixture, and core↔Studio mirror pins
 ```
 
 | Piece | What it is |

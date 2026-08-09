@@ -11,7 +11,7 @@ src/catalogs.ts     SYSTEMS (gatekeeper targets), VERTICALS (+ starter use cases
 src/scoring.ts      hoursPerMonth, rankUseCases, clampNum, slug, fmtNum, effectiveRate
 src/design.ts       designModel (incl. MCP-routed vs custom-build split, Workflows plan), scopeMarkdown
 src/build-guide.ts  buildSteps, buildGuideMarkdown, deploymentJsonc, gatekeeperScaffold
-src/ai.ts           aiPrompt, parseAiSuggestions
+src/ai.ts           aiPrompt (pass-1 draft), aiCritiquePrompt (pass-2 evidence check), parseAiSuggestions
 src/evals.ts        evalSuites (platform red-team + golden per pilot), evalRunMarkdown
 src/workflows.ts    workflowSpecs, workflowSpecMarkdown, suggestedPattern (docs/workflow-patterns.md)
 src/seed.ts         blankClient, hqClient (the firm's own HQ record — the main test fixture)
