@@ -179,6 +179,23 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
     });
   }
 
+  const regulated = c.vertical === "law" || c.vertical === "finserv" || c.vertical === "pt";
+  steps.push({
+    id: "hardening",
+    title: "Harden & instrument the platform",
+    body: `Four small settings that separate a demo from an operated deployment:
+1. **TLS:** zone → SSL/TLS → set **Full (strict)** and enable Always Use HTTPS (fresh zones usually default sane — verify, don't assume).
+2. **Cost alerts:** dashboard → Notifications → add billing and Workers-usage notifications to the IT owner (${c.itOwner || "TBD"}); AI Gateway budget alerts at 80% were set in the gateway step — confirm they point at a watched inbox.
+3. **Log retention:** platform log retention is short by default. Configure **Workers Logpush to an R2 bucket** with a lifecycle rule matching the retention policy${
+      regulated
+        ? " — **REQUIRED for this vertical**: the observation/audit trail must outlive the platform default to support books-and-records / HIPAA-style review. Record bucket + retention period in SECURITY-BASELINE.md."
+        : " — recommended; regulated clients treat it as required. Record the choice in SECURITY-BASELINE.md."
+    }
+4. **Joiner/leaver check:** remove a test user from the IdP/Access group and confirm sign-in dies within a session refresh — offboarding must actually revoke, and now is when you prove it (lifecycle ownership lands in admin training).`,
+    verify:
+      "HTTPS is forced; a test notification arrived; logs appear in the retention bucket; the removed test user can no longer sign in.",
+  });
+
   steps.push({
     id: "mcpcheck",
     title: "Check for vendor MCP servers before building custom",

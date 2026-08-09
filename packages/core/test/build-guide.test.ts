@@ -17,6 +17,7 @@ describe("buildSteps", () => {
       "brand",
       "email",
       "webhooks", // HQ has GHL + event-cadence workflows → webhook ingress step
+      "hardening",
       "mcpcheck",
       "sys-google",
       "sys-cfapi",
@@ -29,11 +30,19 @@ describe("buildSteps", () => {
     ]);
   });
 
-  it("webhooks and aisearch steps are conditional; email is always present", () => {
+  it("webhooks and aisearch steps are conditional; email and hardening are always present", () => {
     const bare = buildSteps(blankClient("X")).map((s) => s.id);
     expect(bare).toContain("email");
+    expect(bare).toContain("hardening");
     expect(bare).not.toContain("webhooks");
     expect(bare).not.toContain("aisearch");
+  });
+
+  it("hardening escalates log retention to REQUIRED for regulated verticals", () => {
+    const pt = { ...hqClient(), vertical: "pt" as const };
+    expect(buildSteps(pt).find((s) => s.id === "hardening")!.body).toContain("REQUIRED for this vertical");
+    const agency = buildSteps(hqClient()).find((s) => s.id === "hardening")!;
+    expect(agency.body).toContain("recommended; regulated clients treat it as required");
   });
 
   it("MCP-routed systems get a portal step instead of a gatekeeper build", () => {
@@ -88,7 +97,7 @@ describe("buildGuideMarkdown", () => {
   it("renders every step with numbering and acceptance checks", () => {
     const md = buildGuideMarkdown(hqClient());
     expect(md).toContain("## 1. Prepare your machine");
-    expect(md).toContain("## 20. Pilot readiness — final gate");
-    expect(md.match(/> \*\*You know it worked when:\*\*/g)).toHaveLength(20);
+    expect(md).toContain("## 21. Pilot readiness — final gate");
+    expect(md.match(/> \*\*You know it worked when:\*\*/g)).toHaveLength(21);
   });
 });

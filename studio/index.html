@@ -1119,6 +1119,19 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
       verify:`A test event fires the Workflow; a forged request is rejected; the workspace hostname still demands login everywhere.` });
   }
 
+  const regulated = c.vertical === "law" || c.vertical === "finserv" || c.vertical === "pt";
+  steps.push({ id:"hardening", title:"Harden & instrument the platform",
+    body:`<p>Four small settings that separate a demo from an operated deployment:</p>
+    <ol>
+      <li><strong>TLS:</strong> zone → SSL/TLS → set <strong>Full (strict)</strong> and enable Always Use HTTPS (fresh zones usually default sane — verify, don't assume).</li>
+      <li><strong>Cost alerts:</strong> dashboard → Notifications → billing + Workers-usage notifications to ${esc(c.itOwner||"the IT owner")}; confirm the AI Gateway 80% budget alerts point at a watched inbox.</li>
+      <li><strong>Log retention:</strong> platform log retention is short by default. Configure <strong>Workers Logpush → an R2 bucket</strong> with a lifecycle rule matching the retention policy${regulated
+        ? ` — <strong>REQUIRED for this vertical</strong>: the audit trail must outlive the platform default (books-and-records / HIPAA-style review). Record bucket + period in SECURITY-BASELINE.md.`
+        : ` — recommended; regulated clients treat it as required. Record the choice in SECURITY-BASELINE.md.`}</li>
+      <li><strong>Joiner/leaver check:</strong> remove a test user from the IdP/Access group and confirm sign-in dies within a session refresh — offboarding must actually revoke, and now is when you prove it.</li>
+    </ol>`,
+    verify:`HTTPS is forced; a test notification arrived; logs appear in the retention bucket; the removed test user can no longer sign in.` });
+
   steps.push({ id:"mcpcheck", title:"Check for vendor MCP servers before building custom",
     body:`<p>Cloudflare OS connects to external systems two ways: its own Gatekeepers, and <strong>existing MCP servers</strong> governed through <strong>MCP Server Portals</strong> (Cloudflare One AI controls). MCP v2 made servers stateless HTTP workloads, and vendors are shipping official remote servers fast — so before each custom build below:</p>
     <ol>

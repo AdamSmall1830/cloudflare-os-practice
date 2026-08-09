@@ -583,6 +583,7 @@ flowchart LR
         <li>Email Routing enabled on the zone + magic-inbox alias created; SPF/DKIM/DMARC health of the sending domain confirmed with IT</li>
         <li>Webhook ingress plan where event workflows exist: dedicated hooks path/hostname with Access bypass or service auth + rate limit (never on the workspace hostname)</li>
         <li>AI Search instance over the R2 knowledge bucket (when SOP corpora are in scope)</li>
+        <li>Hardening decisions: TLS Full (strict), billing/usage notification recipients, Workers Logpush → R2 retention bucket + period (required for regulated verticals)</li>
       </ul>
     </div>
     <div class="check-group">

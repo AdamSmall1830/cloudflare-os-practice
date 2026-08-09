@@ -113,6 +113,7 @@ ${rows || "| (none granted yet) | | | | | |"}
 - Agents/apps start with zero access; every capability is an explicit gatekeeper/portal grant.
 - App server code runs with outbound networking disabled; reach is capability-only.
 - Observation logging on; verify-on-share enforced; data-flow policy per the matrix.
+- Log retention: Workers Logpush → R2 bucket \`TODO\` · retention period \`TODO\` (regulated verticals: required — see the hardening step).
 - Vertical guardrail: ${c.vertical !== "other" ? "see policy skill" : "n/a"} — evals (EVALS.md) prove these hold, pre-pilot and on every release bump.
 
 ## Incident runbook — suspected agent misbehavior or credential exposure
