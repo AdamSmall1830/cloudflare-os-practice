@@ -353,12 +353,20 @@ function load(){
   }
   if (!d.active || !d.clients[d.active]) d.active = Object.keys(d.clients)[0];
   if (!d.active) { d.clients.hq = hqClient(); d.active = "hq"; }
-  return d;
+  return normalizeDb(d);
 }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(db)); syncSchedule(); }
 function C(){ return db.clients[db.active]; }
 function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-function slug(s){ return (s||"client").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,24) || "client"; }
+function slug(s){ return (s||"client").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,24).replace(/-+$/,"") || "client"; }
+function effectiveDailyLimit(v){ const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.round(n) : 100; }
+function approverForUseCase(name, risk, approvers){
+  if (risk === "A") return "none (read-only)";
+  const n = (name||"").toLowerCase();
+  if (/refund|payment|invoice|bill|reconcil/.test(n)) return approvers.payments || "TBD (payments approver)";
+  if (/note|chart|record|filing|crm/.test(n)) return approvers.records || "TBD (records approver)";
+  return approvers.sends || "TBD (sends approver)";
+}
 function toast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2200); }
 function copyText(txt){
   if (navigator.clipboard && navigator.clipboard.writeText)
@@ -386,7 +394,52 @@ function showCopyModal(txt){
   ov.addEventListener("click", e => { if (e.target === ov) close(); });
   const t = ov.querySelector("textarea"); t.focus(); t.select();
 }
-function clampNum(v, min, max, dflt){ const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : dflt; }
+function clampNum(v, min, max, dflt){ const n = (typeof v === "number") ? v : (typeof v === "string" && v.trim() !== "" ? Number(v) : NaN); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : dflt; }
+
+/* Normalize an imported/synced record: coerce numerics, whitelist enums, sanitize
+   host-bound strings, and guarantee container shapes. This is the security boundary
+   for untrusted JSON (import + sync) — it neutralizes the stored-XSS and app-brick
+   classes at the point of entry, before anything renders. */
+function pick(v, allowed, dflt){ return allowed.includes(v) ? v : dflt; }
+function safeStr(v, max){ return (typeof v === "string" ? v : "").slice(0, max||400); }
+function hostSafe(v){ return safeStr(v, 253).replace(/[^A-Za-z0-9.\-]/g, ""); } // domains/audience/account: no HTML metachars
+function emailsSafe(v){ return safeStr(v, 400).replace(/[<>"'`]/g, ""); }
+function normalizeClient(c){
+  c = c && typeof c === "object" ? c : {};
+  // Locals (not module consts) so normalizeClient is safe to call from load()
+  // during boot, before any module-level const would have initialized.
+  const VALID_VERTICALS = Object.keys(VERTICALS);
+  const VALID_IDP = ["access","google","password"];
+  const VALID_PROVIDER = ["anthropic","openai","mix","workersai"];
+  const VALID_KTYPE = ["sops","wiki","templates","data","other"];
+  const A = (x) => Array.isArray(x) ? x : [];
+  const O = (x) => (x && typeof x === "object" && !Array.isArray(x)) ? x : {};
+  const ap = O(c.approvers);
+  const out = Object.assign(blankClient(safeStr(c.name, 120) || "Client"), {
+    vertical: pick(c.vertical, VALID_VERTICALS, "other"),
+    size: (c.size === "" || c.size == null) ? "" : clampNum(c.size, 0, 1000000, 0),
+    sponsor: safeStr(c.sponsor, 120), itOwner: safeStr(c.itOwner, 120),
+    domain: hostSafe(c.domain), accountId: hostSafe(c.accountId), audience: hostSafe(c.audience),
+    adminEmails: emailsSafe(c.adminEmails),
+    idp: pick(c.idp, VALID_IDP, "access"),
+    domainOnCf: pick(c.domainOnCf, ["yes","no"], "yes"),
+    provider: pick(c.provider, VALID_PROVIDER, "anthropic"),
+    dailyLimit: clampNum(c.dailyLimit, 0, 100000, 100),
+    hourlyRate: clampNum(c.hourlyRate, 0, 100000, 50),
+    otherSystems: safeStr(c.otherSystems, 400),
+    surveyNotes: safeStr(c.surveyNotes, 20000),
+    systems: A(c.systems).filter(id => SYS.some(s => s.id === id)),
+    mcpRoutes: (() => { const src = O(c.mcpRoutes), r = {}; for (const k in src) if (SYS.some(s=>s.id===k)) r[k] = !!src[k]; return r; })(),
+    knowledge: A(c.knowledge).map(k => ({ name: safeStr(O(k).name || k, 200), type: pick(O(k).type, VALID_KTYPE, "sops"), owner: safeStr(O(k).owner, 120) })),
+    interviews: A(c.interviews).map(iv => { iv = O(iv); const ans = O(iv.answers), na = {}; for (const i in ans) na[i] = safeStr(ans[i], 5000); return { person: safeStr(iv.person,120), role: safeStr(iv.role,120), date: safeStr(iv.date,20), answers: na, _open: false }; }),
+    inbox: A(c.inbox).map(it => ({ text: safeStr(O(it).text || it, 400), dept: safeStr(O(it).dept, 60), freq: clampNum(O(it).freq, 0, 500, 1) })),
+    approvers: { payments: safeStr(ap.payments,120), sends: safeStr(ap.sends,120), records: safeStr(ap.records,120) },
+    steps: (() => { const src = O(c.steps), r = {}; for (const k in src) r[k] = !!src[k]; return r; })(),
+    useCases: A(c.useCases).map(u => { u = O(u); return { name: safeStr(u.name,120), dept: safeStr(u.dept,40), freq: clampNum(u.freq,0,500,1), minutes: clampNum(u.minutes,0,600,15), people: clampNum(u.people,1,500,1), feas: clampNum(u.feas,1,5,3), risk: pick(u.risk,["A","B","C"],"B"), cadence: pick(u.cadence,["demand","daily","weekly","event"],"demand"), systems: A(u.systems).filter(id => SYS.some(s=>s.id===id)), pilot: !!u.pilot }; }),
+  });
+  return out;
+}
+function normalizeDb(d){ if (d && d.clients) for (const k in d.clients) d.clients[k] = normalizeClient(d.clients[k]); return d; }
 function fmtNum(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 function effectiveRate(rate){ const n = Number(rate); return Number.isFinite(n) && n > 0 ? Math.round(n) : 50; }
 
@@ -396,7 +449,7 @@ function effectiveRate(rate){ const n = Number(rate); return Number.isFinite(n) 
    file://, plain static host) every call below fails quietly → classic local mode. */
 var SYNC = { mode: "local", email: "", timer: null, status: "" }; // var: hoist-safe — save() fires during boot migration before this line runs
 
-function serverBlob(){ const copy = { ...db }; delete copy.aiKey; return JSON.stringify(copy); }
+function serverBlob(){ const copy = { ...db }; delete copy.aiKey; delete copy.aiProxySecret; return JSON.stringify(copy); }
 
 async function syncInit(){
   try {
@@ -409,9 +462,10 @@ async function syncInit(){
     if (rec.ok) {
       const remote = await rec.json();
       if (remote && remote.clients && Object.keys(remote.clients).length) {
-        const localKey = db.aiKey;
-        db = remote;
+        const localKey = db.aiKey, localSecret = db.aiProxySecret;
+        db = normalizeDb(remote);                        // untrusted server blob → sanitize before use
         if (localKey) db.aiKey = localKey;               // key custody stays on-device
+        if (localSecret) db.aiProxySecret = localSecret;
         localStorage.setItem(LS_KEY, JSON.stringify(db));
       } else {
         await syncPush();                                 // first device seeds the server
@@ -495,9 +549,9 @@ document.getElementById("importFile").onchange = e => {
   f.text().then(txt => {
     try {
       const d = JSON.parse(txt); const c = d.client || d;
-      if (!c.name) throw new Error("no name");
+      if (!c || !c.name) throw new Error("no name");
       const id = slug(c.name) + "-" + Date.now().toString(36).slice(-4);
-      db.clients[id] = Object.assign(blankClient(c.name), c); db.active = id; save(); render(); toast("Imported");
+      db.clients[id] = normalizeClient(c); db.active = id; save(); render(); toast("Imported");
     } catch(err){ toast("Not a valid export file"); }
   });
   e.target.value = "";
@@ -765,7 +819,7 @@ function wireDiscovery(){
   document.getElementById("btnSeed").onclick = () => {
     const st = VERTICALS[c.vertical].starters;
     if (!st.length) { toast("No starters for this vertical"); return; }
-    st.forEach(s => c.useCases.push({ ...s, pilot:false }));
+    st.forEach(s => c.useCases.push({ ...s, systems:[...s.systems], pilot:false }));
     st.forEach(s => s.systems.forEach(id => { if (!c.systems.includes(id) && SYS.some(x=>x.id===id)) c.systems.push(id); }));
     save(); render(); toast("Starters added — adjust the numbers to their reality");
   };
@@ -885,7 +939,10 @@ function ingestAI(raw){
   if (!Array.isArray(arr)) { toast("Expected a JSON array"); return; }
   const okIds = new Set(SYS.map(s => s.id));
   let added = 0, skipped = 0;
-  arr.slice(0, 15).forEach(r => {
+  // Validate/dedupe the whole response first, cap accepted rows at 15 — leading
+  // duplicates must not crowd out genuinely new later suggestions.
+  arr.forEach(r => {
+    if (added >= 15) return;
     if (!r || typeof r.name !== "string" || !r.name.trim()) { skipped++; return; }
     if (c.useCases.some(u => u.name.trim().toLowerCase() === r.name.trim().toLowerCase())) { skipped++; return; }
     c.useCases.push({
@@ -945,38 +1002,22 @@ async function aiViaEndpoint(){
   }
 }
 
-const WORKER_SNIPPET = `// ai-proxy worker — deploy in the SAME Cloudflare account, key stays server-side
-// wrangler secret put ANTHROPIC_API_KEY
-const CORS = {
-  "access-control-allow-origin": "https://studio.yourfirm.com", // your studio hostname
-  "access-control-allow-methods": "POST, OPTIONS",
-  "access-control-allow-headers": "content-type"
-};
-export default {
-  async fetch(req, env) {
-    if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
-    if (req.method !== "POST") return new Response("POST only", { status: 405, headers: CORS });
-    const { prompt } = await req.json();
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 3000,
-        messages: [{ role: "user", content: prompt }]
-      })
-    });
-    const j = await r.json();
-    const text = (j.content && j.content[0] && j.content[0].text) || "";
-    return new Response(JSON.stringify({ text }), {
-      headers: { "content-type": "application/json", ...CORS }
-    });
-  }
-};`;
+const WORKER_SNIPPET = `// Deploy the practice repo's multi-provider BYOK proxy — do NOT paste a
+// single-provider snippet here, or the brain picker/BYOK will silently send
+// to the wrong model. Source: workers/ai-proxy/src/index.ts
+//
+//   pnpm --filter @cfos-practice/ai-proxy deploy
+//   # optional server-default keys (BYOK requests bring their own):
+//   wrangler secret put ANTHROPIC_API_KEY
+//   wrangler secret put OPENAI_API_KEY
+//
+// It accepts { prompt, provider, model, apiKey, baseUrl } and routes to
+// anthropic / openai / openai-compatible / workers-ai. User keys pass through
+// per request and are never stored. Lock ALLOWED_ORIGIN to this Studio's
+// hostname and put Cloudflare Access in front of the Worker route.
+//
+// If you can't use the repo, copy workers/ai-proxy/src/index.ts verbatim —
+// its logic is what the brain picker above expects.`;
 
 /* =============================== design =============================== */
 function designModel(){
@@ -992,6 +1033,7 @@ function designModel(){
   let pilots = ranked.filter(u=>u.pilot);
   const suggested = ranked.filter(u=>u.risk!=="C").slice(0,5);
   if (!pilots.length) pilots = suggested;
+  const noEligiblePilots = pilots.length === 0 && c.useCases.length > 0;
   const totalHrs = Math.round(pilots.reduce((a,u)=>a+u.hrsMo,0));
   const rate = effectiveRate(c.hourlyRate);
   const totalVal = totalHrs * rate;
@@ -999,13 +1041,13 @@ function designModel(){
   const small = Number(c.size||0) > 0 && Number(c.size) <= 30;
   const intWeeks = Math.max(2, Math.ceil(customBuild.length*1.5));
   const weeks = (small?2:3) + 1 + intWeeks + 3 + (Number(c.size)>100?4:3) + 2;
-  return { c, chosen, stock, custom, mcpRouted, customBuild, workflows, ranked, pilots, suggested, totalHrs, totalVal, rate, weeks, small, intWeeks };
+  return { c, chosen, stock, custom, mcpRouted, customBuild, workflows, ranked, pilots, suggested, noEligiblePilots, totalHrs, totalVal, rate, weeks, small, intWeeks };
 }
 
 function scopeMarkdown(m){
   const { c } = m;
   return `# ${c.name} — Cloudflare OS Deployment: Proposed Scope
-_Prepared ${new Date().toLocaleDateString()} · ${VERTICALS[c.vertical].label} · ~${c.size||"?"} employees_
+_Prepared ${new Date().toISOString().slice(0,10)} · ${VERTICALS[c.vertical].label} · ~${c.size||"?"} employees_
 
 ## Objective
 Deploy Cloudflare OS as a governed AI agent workspace in ${c.name}'s own Cloudflare account: every employee gets an agent grounded in company knowledge, with all external actions mediated by credential-holding Gatekeepers, audit logging, and human approval queues.
@@ -1036,7 +1078,7 @@ ${(c.knowledge||[]).map(k=>{
 
 ## Governance
 - Sign-in: ${c.idp==="access"?"Cloudflare Access + client IdP":c.idp==="google"?"Google OAuth (auth gatekeeper)":"Password (interim)"}
-- Models: ${c.provider} via AI Gateway; ${c.dailyLimit} calls/user/day allowance; per-team budgets
+- Models: ${c.provider} via AI Gateway; ${effectiveDailyLimit(c.dailyLimit)} calls/user/day allowance; per-team budgets
 - Approvals: payments → ${c.approvers.payments||"TBD"}; outbound sends → ${c.approvers.sends||"TBD"}; records/filings → ${c.approvers.records||"TBD"}
 - Vertical guardrails: ${VERTICALS[c.vertical].guard}
 
@@ -1061,7 +1103,7 @@ function renderDesign(){
   }).join("");
   const polRows = m.pilots.map(u=>{
     const pol = u.risk==="A" ? "Read-only bindings; no approval needed" : u.risk==="B" ? "Write behind approval queue" : "External side effects — approval + simulate-first, do not pilot";
-    const appr = u.risk==="A" ? "—" : (u.name.toLowerCase().match(/refund|payment|invoice|bill/) ? (c.approvers.payments||"TBD") : u.name.toLowerCase().match(/note|chart|record|filing|crm/) ? (c.approvers.records||"TBD") : (c.approvers.sends||"TBD"));
+    const appr = u.risk==="A" ? "—" : approverForUseCase(u.name, u.risk, c.approvers);
     return `<tr><td style="white-space:normal">${esc(u.name)}</td><td><span class="pill tier${u.risk}">${u.risk}</span></td><td style="white-space:normal">${pol}</td><td>${esc(appr)}</td></tr>`;
   }).join("");
   return `
@@ -1069,6 +1111,7 @@ function renderDesign(){
   <p class="hint">Generated live from Discovery. Adjust the inputs there and this regenerates; when it looks right, copy the scope document and drop it into your proposal.</p>
 
   <div class="card"><h3>Pilot charter <span class="tag">${c.useCases.some(u=>u.pilot) ? "your manual pilot selection" : "auto-suggested: top 5 by value × feasibility, C-risk excluded — tick Pilot boxes in Discovery to override"}</span></h3>
+    ${m.noEligiblePilots ? '<div class="warnbox">⚠ No eligible pilot workflows: every candidate use case is tier C (external side effects), which is never auto-piloted. Add a read-only or write-behind-approval use case, or manually pilot a de-risked version.</div>' : ""}
     <div class="tbl"><table><thead><tr><th>Workflow</th><th>Dept</th><th>Hrs/mo</th><th>Risk</th><th>Systems</th></tr></thead><tbody>${pilotRows || '<tr><td colspan="5" class="empty">Add use cases in Discovery.</td></tr>'}</tbody></table></div>
     <p style="margin:0.6rem 0 0"><strong>~${m.totalHrs} hours/month ≈ $${fmtNum(m.totalVal)}/month</strong> of recoverable value across the pilot set (at $${m.rate}/hr loaded) — this is your anchor for pricing and for the pilot's METRICS log.</p>
   </div>
@@ -1103,7 +1146,7 @@ function renderDesign(){
       <tr><td>Digests, triage, summaries</td><td>${c.provider==="workersai"?"Workers AI small models":"Fast/cheap tier (e.g. Haiku-class)"}</td><td>Default for Workflows</td></tr>
       <tr><td>Drafting, briefs, gadget building</td><td>${c.provider==="openai"?"OpenAI mid tier":"Sonnet-class mid tier"}</td><td>Default for Workspaces</td></tr>
       <tr><td>High-value judgment work</td><td>Frontier tier, explicitly selected</td><td>Per-team budget cap in AI Gateway</td></tr>
-      <tr><td>All users</td><td>—</td><td>${c.dailyLimit} calls/user/day allowance; alerts at 80% of team budget</td></tr>
+      <tr><td>All users</td><td>—</td><td>${effectiveDailyLimit(c.dailyLimit)} calls/user/day allowance; alerts at 80% of team budget</td></tr>
     </tbody></table></div>
   </div>
 
@@ -1207,13 +1250,13 @@ pnpm install`,
     body:`<p>Open <code>deployment.jsonc</code> in the cloned repo. It ships as a commented template — set these values (match by meaning; exact key names come from the template in your pinned release):</p>`,
     code:`{
   // ---- ${c.name} · generated by Cloudflare OS Studio ----
-  "accountId": "${c.accountId || "<PASTE ACCOUNT ID — step 2>"}",
-  "hostname": "${host}",
+  "accountId": ${JSON.stringify(c.accountId || "<PASTE ACCOUNT ID>")},
+  "hostname": ${JSON.stringify(host)},
   // staging deployment (second copy of this file or env-specific block):
-  //   "hostname": "${stag}",
-  "workerName": "${sl}-os",
-  ${c.idp==="access" ? `"accessAudience": "${c.audience || "<PASTE AUD TAG — Access step>"}",` : `// no Access audience — sign-in via ${c.idp==="google"?"AUTH_GATEKEEPERS=google":"password auth"}`}
-  "adminEmails": [${admins.split(",").map(e=>`"${e.trim()}"`).join(", ")}]
+  //   "hostname": ${JSON.stringify(stag)},
+  "workerName": ${JSON.stringify(sl+"-os")},
+  ${c.idp==="access" ? `"accessAudience": ${JSON.stringify(c.audience || "<PASTE AUD TAG — Access step>")},` : `// no Access audience — sign-in via ${c.idp==="google"?"AUTH_GATEKEEPERS=google":"password auth"}`}
+  "adminEmails": [${admins.split(",").map(e=>JSON.stringify(e.trim())).join(", ")}]
   // KV namespaces + R2 bucket auto-provision on first deploy;
   // pin them here afterwards if the template asks for explicit IDs.
 }`,
@@ -1239,7 +1282,7 @@ pnpm deploy    # builds and pushes to the client's account
 CF_AI_GATEWAY=${sl}-gw
 CF_AI_GATEWAY_ACCOUNT_ID=${c.accountId || "<ACCOUNT ID>"}
 CF_AI_GATEWAY_API_TOKEN=<secret — use wrangler secret put>
-DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
+DAILY_LLM_CALL_LIMIT=${effectiveDailyLimit(c.dailyLimit)}`,
     verify:`Ask the workspace agent anything; the request appears in the AI Gateway logs with attribution. Set a team budget alert at 80%.` });
 
   steps.push({ id:"brand", title:"Branding & announcements",
@@ -1297,7 +1340,7 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
   const sysSteps = {
     google: { t:"Connect Google Workspace (stock gatekeeper)", b:`<ol>
       <li>In <code>console.cloud.google.com</code> (same project as sign-in if you made one): enable the Gmail, Calendar, and Drive APIs.</li>
-      <li>Create an OAuth client (Web application) with redirect URI <code>https://${host}/gatekeeper/google/oauth</code>.</li>
+      <li>Create an OAuth client (Web application) with redirect URI <code>https://${esc(host)}/gatekeeper/google/oauth</code>.</li>
       <li>Put the client ID/secret into the Google gatekeeper's credential config (per that gatekeeper's doc page in the repo — credentials live on the gatekeeper Worker, never in agent-visible code).</li>
       <li>A pilot user clicks Connect on the Google gatekeeper and grants the fuller scopes; policy starts <strong>read-only</strong>: no send scope until pilot week 2.</li></ol>`,
       v:`A pilot user's agent can summarize their inbox but a send attempt lands in the approval queue (or is refused), not in Sent.` },
@@ -1306,7 +1349,7 @@ DAILY_LLM_CALL_LIMIT=${c.dailyLimit || 100}`,
     confluence: { t:"Connect Confluence (stock gatekeeper)", b:`<ol><li>Create an API token in the client's Atlassian admin.</li><li>Scope the gatekeeper to the specific spaces that belong in agent context.</li><li>Token into the gatekeeper credential config.</li></ol>`, v:`Agent cites a Confluence page correctly.` },
     zoominfo: { t:"Connect ZoomInfo (stock gatekeeper)", b:`<ol><li>Get API credentials from the client's ZoomInfo admin portal.</li><li>Configure per the gatekeeper's doc page; set a per-day lookup cap in policy.</li></ol>`, v:`Agent enriches a test company; the lookup appears in the observation log.` },
     m365: { t:"Build the Microsoft 365 gatekeeper (custom · Graph)", b:`<ol>
-      <li>entra.microsoft.com → App registrations → New. Single tenant. Redirect URI: <code>https://${host}/gatekeeper/m365/oauth</code>.</li>
+      <li>entra.microsoft.com → App registrations → New. Single tenant. Redirect URI: <code>https://${esc(host)}/gatekeeper/m365/oauth</code>.</li>
       <li>API permissions (delegated, admin consent): start with <code>Mail.Read</code>, <code>Calendars.Read</code>. Add write scopes only after pilot proves reads.</li>
       <li>Client secret → gatekeeper credential config.</li>
       <li>Scaffold the gatekeeper in <code>packages/custom-gatekeeper</code> — align the class shape with the gatekeeper interface in your pinned release (crib from a stock gatekeeper in the upstream <code>packages/</code>):</li></ol>`,
@@ -1322,7 +1365,7 @@ export class M365Gatekeeper {
 }`, v:`Agent summarizes a mailbox; drafts appear in Outlook Drafts, nothing sends.` },
     qbo: { t:"Build the QuickBooks Online gatekeeper (custom)", b:`<ol>
       <li>developer.intuit.com → sign in with the client's Intuit developer account (create one owned by them) → Create an app → QuickBooks Online and Payments → scope <code>com.intuit.quickbooks.accounting</code>.</li>
-      <li>Redirect URI: <code>https://${host}/gatekeeper/qbo/oauth</code>. Note client ID/secret.</li>
+      <li>Redirect URI: <code>https://${esc(host)}/gatekeeper/qbo/oauth</code>. Note client ID/secret.</li>
       <li>Connect the <strong>sandbox company first</strong>; production consent only after the pilot works in sandbox.</li>
       <li>Scaffold:</li></ol>`,
       code:`// packages/custom-gatekeeper/src/qbo.ts — SCAFFOLD
@@ -1378,14 +1421,14 @@ export class HubspotGatekeeper {
   async pipelineDigest(ownerId: string)  { /* open deals by stage, stale flags */ }
   async logActivity(dealId: string, note: string) { /* write behind approval or auto per policy */ }
 }`, v:`Call-prep brief for a real account is accurate; CRM writes appear only after approval.` },
-    salesforce: { t:"Build the Salesforce gatekeeper (custom)", b:`<ol><li>Setup → App Manager → New Connected App; OAuth scopes api, refresh_token; callback <code>https://${host}/gatekeeper/sfdc/oauth</code>.</li><li>Use a dedicated integration user with a read-mostly profile — never an admin user.</li></ol>`, v:`Brief generation works; writes require approval.` },
+    salesforce: { t:"Build the Salesforce gatekeeper (custom)", b:`<ol><li>Setup → App Manager → New Connected App; OAuth scopes api, refresh_token; callback <code>https://${esc(host)}/gatekeeper/sfdc/oauth</code>.</li><li>Use a dedicated integration user with a read-mostly profile — never an admin user.</li></ol>`, v:`Brief generation works; writes require approval.` },
     wealthbox: { t:"Build the Wealthbox/Redtail gatekeeper (custom)", b:`<ol><li>API token from the client's CRM admin settings.</li><li>Read: contacts, notes, tasks. Write (notes/tasks) behind advisor approval per the policy matrix.</li></ol>`, v:`Meeting-prep brief pulls real CRM history; note-writes queue for the advisor.` },
     orion: { t:"Connect the portfolio platform (custom)", b:`<ol><li>Request API credentials through the client's Orion/Black Diamond rep (this takes days — start early).</li><li>Read-only holdings/performance. No trading endpoints, ever.</li></ol>`, v:`Review-deck numbers match the portfolio platform's own report.` },
     emoney: { t:"Connect planning software (custom)", b:`<ol><li>API access via the vendor; read-only plan summaries.</li></ol>`, v:`Plan facts in briefs match the planning tool.` },
     netsuite: { t:"Build the NetSuite gatekeeper (custom)", b:`<ol><li>Setup → Integration → Manage Integrations → New; token-based auth; a role limited to the records in scope (quotes, POs, items).</li><li>Read-only first; PO/quote writes behind ${esc(c.approvers.payments||"the approver")}.</li></ol>`, v:`Quote-history lookups match NetSuite saved searches.` },
     epicor: { t:"Reach the on-prem ERP (custom via Tunnel)", b:`<ol><li>Install <code>cloudflared</code> on a server that can reach the ERP's API/DB (IT does this with you).</li><li>Create a Tunnel; expose only the specific API endpoints needed, protected by Access service auth.</li><li>Gatekeeper calls through the tunnel; <strong>read-only, always</strong>, for anything near OT/MES.</li></ol>`, v:`Downtime digest matches the ERP report; the tunnel dashboard shows only expected traffic.` },
     cmms: { t:"Connect the CMMS (custom)", b:`<ol><li>API token from the CMMS admin; read tickets/assets, write (new ticket drafts) behind approval.</li></ol>`, v:`Maintenance summaries cite real tickets.` },
-    clio: { t:"Build the Clio gatekeeper (custom)", b:`<ol><li>app.clio.com → Settings → Developer Applications → New; redirect <code>https://${host}/gatekeeper/clio/oauth</code>.</li><li>Read matters/contacts/calendars; time-entry and document writes behind attorney approval.</li></ol>`, v:`Docket digest matches Clio's calendar; nothing writes without approval.` },
+    clio: { t:"Build the Clio gatekeeper (custom)", b:`<ol><li>app.clio.com → Settings → Developer Applications → New; redirect <code>https://${esc(host)}/gatekeeper/clio/oauth</code>.</li><li>Read matters/contacts/calendars; time-entry and document writes behind attorney approval.</li></ol>`, v:`Docket digest matches Clio's calendar; nothing writes without approval.` },
     imanage: { t:"Connect the DMS (custom)", b:`<ol><li>API access via the client's DMS admin (iManage Control Center / NetDocuments admin).</li><li><strong>Scope per matter</strong> — the gatekeeper enforces ethical walls; verify a walled user cannot pull a walled matter.</li></ol>`, v:`Red-team check: an agent for a walled user gets a refusal, logged in observations.` },
     webpt: { t:"Connect the EMR (custom · PHI)", b:`<div class="warnbox">STOP unless BAAs are signed — Cloudflare (enterprise) and the model provider. No PHI flows before paperwork.</div><ol><li>API credentials via the EMR's integration program (WebPT/Prompt/Jane each have one; lead time days–weeks).</li><li>Minimum-necessary scoping per role; therapists see their patients only.</li><li>Data-flow policy: PHI reads block external sends.</li></ol>`, v:`Chart-prep worksheet renders for a test patient; an attempted external send after a PHI read is blocked and logged.` },
     clearing: { t:"Connect eligibility/clearinghouse (custom · PHI)", b:`<ol><li>API credentials from the clearinghouse account.</li><li>Per-check logging; benefits worksheets only — no claim submission in phase one.</li></ol>`, v:`Benefits check for a test patient matches the portal's answer.` }
@@ -1394,7 +1437,7 @@ export class HubspotGatekeeper {
   const routes = c.mcpRoutes || {};
   SYS.filter(s => c.systems.includes(s.id)).sort((a,b)=>a.wave-b.wave).forEach(s => {
     if (s.kind === "custom" && routes[s.id]) {
-      steps.push({ id:"mcp-"+s.id, title:`Connect ${s.label.split(" (")[0]} via MCP Server Portal`,
+      steps.push({ id:"mcp-"+s.id, title:`Connect ${s.label} via MCP Server Portal`,
         body:`<p>This system is routed through the vendor's remote MCP server — configuration, not code.</p>
         <ol>
           <li>Confirm the vendor's official MCP server URL and auth method in their developer docs (re-verify at build time; tool surfaces change).</li>
@@ -1410,7 +1453,7 @@ export class HubspotGatekeeper {
   });
 
   const kn = c.knowledge || [];
-  if (kn.some(k => k.type === "sops" || k.type === "other")) {
+  if (kn.some(k => k.type !== "wiki" && k.type !== "templates" && k.type !== "data")) {
     steps.push({ id:"aisearch", title:"Stand up AI Search over the knowledge bucket",
       body:`<p>Document-type knowledge retrieves through AI Search (embeddings-based hybrid retrieval) — create it before the knowledge step can mean anything.</p>
       <ol>
@@ -1544,7 +1587,7 @@ function blueprintBuild(){
   const c = C();
   const m = designModel();
   const steps = buildSteps();
-  const date = new Date().toLocaleDateString();
+  const date = new Date().toISOString().slice(0,10);
   const host = hostnameFor(c);
   const codes = [];
   const pilotRows = m.pilots.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.dept)}</td><td>${Math.round(u.hrsMo)}</td><td>${u.risk}</td><td>${esc(u.cadence||"demand")}</td></tr>`).join("")
@@ -1556,7 +1599,7 @@ function blueprintBuild(){
   }).join("") || `<tr><td colspan="4">No systems selected yet — check them in Discovery's systems inventory.</td></tr>`;
   const polRows = m.pilots.map(u=>{
     const pol = u.risk==="A" ? "Read-only; no approval needed" : u.risk==="B" ? "Write behind approval queue" : "External side effects — approval + simulate-first";
-    const appr = u.risk==="A" ? "—" : (u.name.toLowerCase().match(/refund|payment|invoice|bill|reconcil/) ? (c.approvers.payments||"TBD") : u.name.toLowerCase().match(/note|chart|record|filing|crm/) ? (c.approvers.records||"TBD") : (c.approvers.sends||"TBD"));
+    const appr = u.risk==="A" ? "—" : approverForUseCase(u.name, u.risk, c.approvers);
     return `<tr><td>${esc(u.name)}</td><td>${u.risk}</td><td>${pol}</td><td>${esc(appr)}</td></tr>`;
   }).join("");
   const wfRows = m.workflows.map(u=>`<tr><td>${esc(u.name)}</td><td>${u.cadence==="event"?"external event / webhook":esc(u.cadence)}</td><td>${esc(u.dept)}</td></tr>`).join("");
@@ -1601,7 +1644,7 @@ function blueprintBuild(){
     <tr><td>Digests, triage, summaries</td><td>${c.provider==="workersai"?"Workers AI small models":"Fast/cheap tier"}</td><td>Default for Workflows</td></tr>
     <tr><td>Drafting, briefs, gadget building</td><td>${c.provider==="openai"?"OpenAI mid tier":"Mid tier"}</td><td>Default for Workspaces</td></tr>
     <tr><td>High-value judgment work</td><td>Frontier tier, explicitly selected</td><td>Per-team budget cap in AI Gateway</td></tr>
-    <tr><td>All users</td><td>—</td><td>${c.dailyLimit} calls/user/day allowance; alerts at 80% of budget</td></tr>
+    <tr><td>All users</td><td>—</td><td>${effectiveDailyLimit(c.dailyLimit)} calls/user/day allowance; alerts at 80% of budget</td></tr>
   </tbody></table>
 
   <h2 class="bp-break">The setup walkthrough — ${steps.length} steps</h2>
