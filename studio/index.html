@@ -1240,11 +1240,13 @@ wrangler login   # opens a browser — log in to the CLIENT's Cloudflare account
   }
 
   steps.push({ id:"clone", title:"Clone the starter and install",
-    body:`<p>The starter wraps a <strong>pinned Cloudflare OS release</strong> with the client's config — you never patch upstream code.</p>`,
+    body:`<p>The starter wraps a <strong>pinned Cloudflare OS version</strong> — a git submodule pinned to an upstream commit — with the client's config; you never patch upstream code. The submodule is why a plain clone isn't enough:</p>`,
     code:`git clone https://github.com/cloudflare/cloudflare-os-starter.git ${sl}-os
 cd ${sl}-os
-pnpm install`,
-    verify:`<code>pnpm install</code> completes without errors and the repo contains <code>deployment.jsonc</code>.` });
+git submodule update --init      # pull the pinned cloudflare-os submodule
+pnpm install
+pnpm --dir cloudflare-os install # install the upstream's dependencies too`,
+    verify:`<code>git submodule status</code> shows the pinned cloudflare-os commit (not empty); <code>deployment.jsonc</code> is present and both installs finished clean.` });
 
   steps.push({ id:"config", title:"Fill deployment.jsonc",
     body:`<p>Open <code>deployment.jsonc</code> in the cloned repo. It ships as a commented template — set these values (match by meaning; exact key names come from the template in your pinned release):</p>`,

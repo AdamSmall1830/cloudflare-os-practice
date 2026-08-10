@@ -12,7 +12,7 @@ Update on every upgrade, incident, or integration change. One row per deployment
 |  |  |  |  |  |  |  |  |  |  |
 
 Column rules:
-- **Release pin** — the exact cloudflare-os release the deployment runs. Never "latest."
+- **Release pin** — the exact cloudflare-os **submodule commit** the deployment runs (there are no tagged releases yet; the starter pins upstream as a git submodule). Record the short SHA. Never "latest."
 - **Evals on staging** — date + result of the full eval run (EVALS.md protocol) against the *new* pin. Blockers failing = promotion stops; no exceptions.
 - **Spend/user** — from AI Gateway, monthly; a sudden jump is an incident, not a curiosity.
 - **Next action** — one concrete thing with an owner ("promote 2026-09 pin", "rotate QBO credential", "re-run evals after skill edits").
@@ -21,7 +21,7 @@ Column rules:
 
 Run in this order — our HQ instance is always first (we absorb surprises, clients don't):
 
-1. **Pick the pin.** Choose the release; read its changelog against each deployment's surface (gatekeepers, portals, skills-visible behavior).
+1. **Pick the pin.** Choose the upstream cloudflare-os commit to bump the submodule to; read the upstream commit log / upgrade checklist against each deployment's surface (gatekeepers, portals, skills-visible behavior) — there's no packaged changelog, so diff the commits since the current pin.
 2. **HQ first:** bump HQ staging → full eval run → promote HQ prod → live on it for 2–3 days.
 3. **Per client, in tracker order:** bump *their* staging → run *their* eval suites (platform + workflows) → fix or hold on any blocker → promote prod → stamp the tracker row.
 4. **Log the sweep:** date, pin, per-client result, anything held back and why. A held-back client gets a scheduled retry, not a silent skip.

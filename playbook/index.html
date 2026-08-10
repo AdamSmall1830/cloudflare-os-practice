@@ -315,7 +315,7 @@
   <div class="callout warn">
     <h4>Maturity check — set expectations honestly</h4>
     <ul>
-      <li>v2 is a <strong>complete rewrite</strong>, self-described as early access with "many rough edges"; upstream accepts only trivial PRs right now. Pin releases and plan deliberate upgrade windows — never track main for a client.</li>
+      <li>v2 is a <strong>complete rewrite</strong>, self-described as early access with "many rough edges"; upstream accepts only trivial PRs right now. There are <strong>no tagged releases</strong> yet — the starter pins upstream as a <strong>git submodule commit</strong>; pin it deliberately, bump it on a schedule, and never track main for a client. <em>(Upstream status verified 2026-08-10: active hardening — RPC error classification, Durable Object reset observability, observer-verification OAuth scopes, ambient-gatekeeper preinstall infrastructure, Access logout fix — nothing breaking to our architecture or build steps.)</em></li>
       <li>The managed dashboard product, container support, and Slack-embedded workspaces are <em>roadmap</em>, not shipped. Sell what exists.</li>
       <li>Cloudflare's named implementation partners are Presidio and Happy Cog — the partner motion is real and sanctioned; pursue it formally (Section 03).</li>
       <li>It runs on <code>workerd</code>, the open-source runtime, under Apache-2.0 — a genuine self-host / exit path and a permissive license you can build a proprietary practice on.</li>
