@@ -449,7 +449,7 @@ function effectiveRate(rate){ const n = Number(rate); return Number.isFinite(n) 
    file://, plain static host) every call below fails quietly → classic local mode. */
 var SYNC = { mode: "local", email: "", timer: null, status: "" }; // var: hoist-safe — save() fires during boot migration before this line runs
 
-function serverBlob(){ const copy = { ...db }; delete copy.aiKey; delete copy.aiProxySecret; return JSON.stringify(copy); }
+function serverBlob(){ const copy = { ...db }; delete copy.aiKey; delete copy.aiProxySecret; delete copy.aiCfToken; return JSON.stringify(copy); }
 
 async function syncInit(){
   try {
@@ -462,10 +462,11 @@ async function syncInit(){
     if (rec.ok) {
       const remote = await rec.json();
       if (remote && remote.clients && Object.keys(remote.clients).length) {
-        const localKey = db.aiKey, localSecret = db.aiProxySecret;
+        const localKey = db.aiKey, localSecret = db.aiProxySecret, localCfTok = db.aiCfToken;
         db = normalizeDb(remote);                        // untrusted server blob → sanitize before use
         if (localKey) db.aiKey = localKey;               // key custody stays on-device
         if (localSecret) db.aiProxySecret = localSecret;
+        if (localCfTok) db.aiCfToken = localCfTok;
         localStorage.setItem(LS_KEY, JSON.stringify(db));
       } else {
         await syncPush();                                 // first device seeds the server
@@ -753,6 +754,7 @@ function renderDiscovery(){
         <option value="server" ${(db.aiProvider||"server")==="server"?"selected":""}>Server default (proxy's configured key)</option>
         <option value="anthropic" ${db.aiProvider==="anthropic"?"selected":""}>Anthropic (Claude) — your key</option>
         <option value="openai" ${db.aiProvider==="openai"?"selected":""}>OpenAI — your key</option>
+        <option value="cf-gateway" ${db.aiProvider==="cf-gateway"?"selected":""}>Cloudflare AI Gateway — Dynamic Route (recommended: budgeted &amp; governed)</option>
         <option value="openai-compatible" ${db.aiProvider==="openai-compatible"?"selected":""}>OpenAI-compatible (Groq, Mistral, local…) — your key</option>
         <option value="workers-ai" ${db.aiProvider==="workers-ai"?"selected":""}>Workers AI (proxy account, no key)</option></select></div>
       <div class="field"><label>Your API key <span style="text-transform:none">(BYOK — optional)</span></label><input type="password" id="aiKey" value="${esc(db.aiKey||"")}" placeholder="sk-… / stays on this device" autocomplete="off"></div>
@@ -760,6 +762,13 @@ function renderDiscovery(){
       <div class="field"><label>Base URL (OpenAI-compatible only)</label><input type="text" id="aiBaseUrl" value="${esc(db.aiBaseUrl||"")}" placeholder="https://api.groq.com/openai/v1"></div>
       <div class="field"><label>&nbsp;</label><button id="btnAiRun">Generate via endpoint</button></div>
     </div>
+    <div class="grid2" id="cfGatewayFields" style="margin-top:0.5rem; ${db.aiProvider==="cf-gateway"?"":"display:none"}">
+      <div class="field"><label>Cloudflare account ID <span style="text-transform:none">(the firm's, hosting the gateway)</span></label><input type="text" id="aiCfAccount" value="${esc(db.aiCfAccount||"")}" placeholder="32-char account ID"></div>
+      <div class="field"><label>Gateway name</label><input type="text" id="aiCfGateway" value="${esc(db.aiCfGateway||"")}" placeholder="e.g. our-firm-gw"></div>
+      <div class="field"><label>Dynamic route name</label><input type="text" id="aiCfRoute" value="${esc(db.aiCfRoute||"studio")}" placeholder="studio"></div>
+      <div class="field"><label>Gateway auth token <span style="text-transform:none">(if authenticated; else leave to the proxy secret)</span></label><input type="password" id="aiCfToken" value="${esc(db.aiCfToken||"")}" placeholder="cf-aig-authorization token" autocomplete="off"></div>
+    </div>
+    <p class="hint" id="cfGatewayNote" style="margin:0.3rem 0 0; ${db.aiProvider==="cf-gateway"?"":"display:none"}">The Studio's own AI-assist runs through your firm's <code>dynamic/&lt;route&gt;</code> — the same budgeted, versioned model matrix you deploy for clients. Requests carry <code>cf-aig-metadata</code> (<code>{app:"cfos-studio", pass:1|2}</code>) so the route can branch and cap them. Leave the key/token blank to use the proxy's server-held <code>GATEWAY_KEY</code>/<code>GATEWAY_TOKEN</code> (no secret in the browser).</p>
     <label class="hint" style="display:flex;gap:0.45rem;align-items:center;margin:0.4rem 0 0"><input type="checkbox" id="aiTwoPass" ${db.aiTwoPass?"checked":""}> <span><strong>Two-pass quality:</strong> draft, then an automatic skeptical evidence check (2× model calls; drops unevidenced suggestions, tightens estimates)</span></label>
     <p class="hint" style="margin:0.4rem 0 0.5rem">Key custody: stored only in this browser (never in Exports), sent only to <em>your</em> endpoint per request, never stored server-side by the proxy.</p>
     <div class="warnbox" id="aiEndpointNote" style="display:none">The call was blocked or failed. If you're viewing this as a hosted claude.ai artifact, that's expected — external APIs are blocked by the page sandbox. Use Option 1 here, or self-host this file and try again. If self-hosted: check the endpoint URL, CORS headers, and that the Worker is deployed.</div>
@@ -851,9 +860,15 @@ function wireDiscovery(){
   tp.onchange = () => { db.aiTwoPass = tp.checked; save(); };
   const ep = document.getElementById("aiEndpoint");
   ep.addEventListener("change", () => { db.aiEndpoint = ep.value.trim(); save(); });
-  [["aiProvider","aiProvider"],["aiKey","aiKey"],["aiModel","aiModel"],["aiBaseUrl","aiBaseUrl"]].forEach(pair => {
+  [["aiProvider","aiProvider"],["aiKey","aiKey"],["aiModel","aiModel"],["aiBaseUrl","aiBaseUrl"],
+   ["aiCfAccount","aiCfAccount"],["aiCfGateway","aiCfGateway"],["aiCfRoute","aiCfRoute"],["aiCfToken","aiCfToken"]].forEach(pair => {
     const el2 = document.getElementById(pair[0]);
-    el2.addEventListener("change", () => { db[pair[1]] = el2.value.trim(); save(); });
+    if (el2) el2.addEventListener("change", () => { db[pair[1]] = el2.value.trim(); save(); });
+  });
+  document.getElementById("aiProvider").addEventListener("change", () => {
+    const show = document.getElementById("aiProvider").value === "cf-gateway";
+    document.getElementById("cfGatewayFields").style.display = show ? "" : "none";
+    document.getElementById("cfGatewayNote").style.display = show ? "" : "none";
   });
   document.getElementById("btnAiRun").onclick = aiViaEndpoint;
   document.getElementById("workerSnippet").textContent = WORKER_SNIPPET;
@@ -963,7 +978,7 @@ function ingestAI(raw){
   toast(added ? `${added} added${skipped ? `, ${skipped} skipped` : ""} — review the numbers` : "Nothing new to add");
 }
 
-async function callAiEndpoint(promptText){
+async function callAiEndpoint(promptText, pass){
   const url = (db.aiEndpoint || "").trim();
   const payload = { prompt: promptText };
   const prov = db.aiProvider || "server";
@@ -972,6 +987,14 @@ async function callAiEndpoint(promptText){
     if (db.aiKey) payload.apiKey = db.aiKey;
     if (db.aiModel) payload.model = db.aiModel;
     if (prov === "openai-compatible" && db.aiBaseUrl) payload.baseUrl = db.aiBaseUrl;
+    if (prov === "cf-gateway") {
+      if (db.aiCfAccount) payload.accountId = db.aiCfAccount;
+      if (db.aiCfGateway) payload.gatewayId = db.aiCfGateway;
+      payload.route = db.aiCfRoute || "studio";
+      if (db.aiCfToken) payload.gatewayToken = db.aiCfToken;
+      // Tag for the Dynamic Route's conditional/budget nodes: task + which pass.
+      payload.metadata = { app: "cfos-studio", task: "discovery-synthesis", pass: pass || 1 };
+    }
   }
   const res = await fetch(url, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify(payload) });
   if (!res.ok) throw new Error("HTTP " + res.status);
@@ -987,10 +1010,10 @@ async function aiViaEndpoint(){
   const btn = document.getElementById("btnAiRun");
   btn.disabled = true; btn.textContent = "Pass 1: drafting…";
   try {
-    let text = await callAiEndpoint(aiPrompt());
+    let text = await callAiEndpoint(aiPrompt(), 1);
     if (db.aiTwoPass) {
       btn.textContent = "Pass 2: evidence check…";
-      text = await callAiEndpoint(aiCritiquePrompt(text));
+      text = await callAiEndpoint(aiCritiquePrompt(text), 2);
     }
     ingestAI(text);
   } catch(e){

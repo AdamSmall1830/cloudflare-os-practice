@@ -3,6 +3,9 @@
   // Server-default keys (optional — BYOK requests carry their own):
   //   wrangler secret put ANTHROPIC_API_KEY
   //   wrangler secret put OPENAI_API_KEY
+  // Recommended production brain — cf-gateway → an AI Gateway Dynamic Route:
+  //   wrangler secret put GATEWAY_KEY      # CF API token (account-scoped) or provider key
+  //   wrangler secret put GATEWAY_TOKEN    # optional: gateway cf-aig-authorization token
   "name": "cfos-ai-proxy",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",

@@ -88,7 +88,9 @@ The Worker **cryptographically verifies the Access JWT** (RS256 against your tea
    pnpm --filter @cfos-practice/ai-proxy secret   # paste the Anthropic API key
    ```
 3. Set `ALLOWED_ORIGIN` in [`workers/ai-proxy/wrangler.jsonc`](../workers/ai-proxy/wrangler.jsonc) to your Studio hostname, and put Access in front of the Worker route too (CORS is not authentication).
-4. In the Studio: **Discovery → AI assist → Option 2**, paste the Worker URL, pick the **brain** (Anthropic, OpenAI, any OpenAI-compatible endpoint via base URL, or Workers AI), and optionally paste a **bring-your-own key** — stored only in that browser, sent per-request to your proxy, never stored server-side. Leave the key blank to use the proxy's configured secrets, or choose Workers AI for a zero-key default billed to your account.
+4. In the Studio: **Discovery → AI assist → Option 2**, paste the Worker URL and pick the **brain**. The **recommended production choice is "Cloudflare AI Gateway — Dynamic Route"**: the Studio's own AI-assist then runs through your firm's budgeted, versioned model matrix (the same mechanism you deploy for clients), tagged with `cf-aig-metadata` so the route can branch and cap it. Set the proxy's `GATEWAY_KEY`/`GATEWAY_TOKEN` secrets and fill the account/gateway/route fields — **no key in the browser**. The other brains (Anthropic, OpenAI, any OpenAI-compatible endpoint, Workers AI) remain available with optional BYOK; a bring-your-own key is stored only in that browser and sent per-request, never server-side.
+
+This closes the loop: **your own practice dogfoods dynamic routing** — the cost-governance control you sell is the one running your Studio.
 
 Full security notes: [workers/ai-proxy/README.md](../workers/ai-proxy/README.md)
 

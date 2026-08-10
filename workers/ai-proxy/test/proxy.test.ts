@@ -91,3 +91,51 @@ describe("provider defaults and keys", () => {
     expect(r.body.text).toContain("ok:@cf/meta");
   });
 });
+
+describe("cf-gateway provider (Dynamic Routes)", () => {
+  it("hits the compat endpoint, invokes dynamic/<route>, and sends metadata + gateway auth", async () => {
+    let seen: { url: string; auth: string | null; gwAuth: string | null; meta: string | null; model: string } | null = null;
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const h = new Headers(init?.headers);
+      seen = {
+        url: String(url),
+        auth: h.get("authorization"),
+        gwAuth: h.get("cf-aig-authorization"),
+        meta: h.get("cf-aig-metadata"),
+        model: (JSON.parse(String(init?.body)) as { model: string }).model,
+      };
+      return new Response(JSON.stringify({ choices: [{ message: { content: "routed" } }] }), { headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+
+    const r = await j(
+      await post({
+        prompt: "x", provider: "cf-gateway", accountId: "acct123", gatewayId: "firm-gw",
+        route: "studio", apiKey: "cf-token", gatewayToken: "aig-token", metadata: { app: "cfos-studio", pass: 1 },
+      }),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body.text).toBe("routed");
+    expect(seen!.url).toBe("https://gateway.ai.cloudflare.com/v1/acct123/firm-gw/compat/chat/completions");
+    expect(seen!.model).toBe("dynamic/studio");
+    expect(seen!.auth).toBe("Bearer cf-token");
+    expect(seen!.gwAuth).toBe("Bearer aig-token");
+    expect(JSON.parse(seen!.meta!)).toEqual({ app: "cfos-studio", pass: 1 });
+  });
+
+  it("falls back to server GATEWAY_KEY so the browser holds no key", async () => {
+    let auth: string | null = null;
+    globalThis.fetch = vi.fn(async (_u: RequestInfo | URL, init?: RequestInit) => {
+      auth = new Headers(init?.headers).get("authorization");
+      return new Response(JSON.stringify({ choices: [{ message: { content: "" } }] }), { headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    await post({ prompt: "x", provider: "cf-gateway", accountId: "a", gatewayId: "g", route: "studio" }, { GATEWAY_KEY: "server-cf-token" });
+    expect(auth).toBe("Bearer server-cf-token");
+  });
+
+  it("validates account/gateway ids and requires a route or model", async () => {
+    expect((await j(await post({ prompt: "x", provider: "cf-gateway" }, { GATEWAY_KEY: "k" }))).status).toBe(400);
+    expect((await j(await post({ prompt: "x", provider: "cf-gateway", accountId: "../etc", gatewayId: "g", route: "r" }, { GATEWAY_KEY: "k" }))).status).toBe(400);
+    // valid ids + route but no key anywhere → 401
+    expect((await j(await post({ prompt: "x", provider: "cf-gateway", accountId: "a", gatewayId: "g", route: "studio" }, {}))).status).toBe(401);
+  });
+});

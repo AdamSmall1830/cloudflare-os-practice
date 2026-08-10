@@ -1,11 +1,14 @@
 /**
  * AI proxy for Cloudflare OS Studio — multi-provider, BYOK.
  *
- * POST { prompt, provider?, model?, apiKey?, baseUrl? }  →  { text }
+ * POST { prompt, provider?, model?, apiKey?, baseUrl?, accountId?, gatewayId?, route?, metadata?, gatewayToken? }  →  { text }
  *
  * Providers: "anthropic" (default) · "openai" · "openai-compatible" (any
  * /chat/completions endpoint via baseUrl: Groq, Mistral, Together, a local
- * gateway, …) · "workers-ai" (this account's AI binding — no user key).
+ * gateway, …) · "workers-ai" (this account's AI binding — no user key) ·
+ * "cf-gateway" (Cloudflare AI Gateway compat endpoint — invoke a **Dynamic
+ * Route** via model "dynamic/<route>", with cf-aig-metadata for task-class
+ * routing; this is the recommended production brain — budgeted + governed).
  *
  * Key resolution, in order: request apiKey → x-user-key header → the
  * provider's Worker secret. User keys pass through per-request and are
@@ -17,6 +20,13 @@ export interface Env {
   OPENAI_API_KEY?: string;
   ALLOWED_ORIGIN: string;
   MODEL?: string;
+  /** Optional server-held credentials for the cf-gateway provider, so the
+   *  Studio can run its own AI-assist through the firm's Dynamic Route with
+   *  NO key in the browser. GATEWAY_KEY = a Cloudflare API token (or provider
+   *  key) for Authorization; GATEWAY_TOKEN = the gateway's cf-aig-authorization
+   *  token when the gateway is authenticated. Account-scope the key. */
+  GATEWAY_KEY?: string;
+  GATEWAY_TOKEN?: string;
   /** When set, callers must send a matching `x-proxy-secret` header. A
    *  defense-in-depth gate for non-Access deployments; Access remains the
    *  primary control. */
@@ -34,6 +44,11 @@ interface ProxyRequest {
   model?: unknown;
   apiKey?: unknown;
   baseUrl?: unknown;
+  accountId?: unknown;
+  gatewayId?: unknown;
+  route?: unknown;
+  metadata?: unknown;
+  gatewayToken?: unknown;
 }
 
 const DEFAULT_MODEL: Record<string, string> = {
@@ -41,6 +56,7 @@ const DEFAULT_MODEL: Record<string, string> = {
   openai: "gpt-5",
   "openai-compatible": "",
   "workers-ai": "@cf/meta/llama-3.3-70b-instruct",
+  "cf-gateway": "",
 };
 
 function cors(env: Env): Record<string, string> {
@@ -136,6 +152,47 @@ export default {
           body: JSON.stringify(payload),
         });
         if (!r.ok) return bad(headers, 502, `Upstream ${r.status}`);
+        const j = (await r.json()) as { choices?: Array<{ message?: { content?: string } }> };
+        return new Response(JSON.stringify({ text: j.choices?.[0]?.message?.content ?? "" }), { headers });
+      }
+
+      if (provider === "cf-gateway") {
+        // Cloudflare AI Gateway compat endpoint. The host is always Cloudflare's,
+        // and the account/gateway in the path scope the request — a server
+        // GATEWAY_KEY can't be misdirected off-host, so a server fallback is safe.
+        const account = typeof body.accountId === "string" && body.accountId.trim();
+        const gw = typeof body.gatewayId === "string" && body.gatewayId.trim();
+        if (!account || !gw) return bad(headers, 400, "cf-gateway requires accountId and gatewayId");
+        if (!/^[a-zA-Z0-9_-]+$/.test(account) || !/^[a-zA-Z0-9_-]+$/.test(gw)) {
+          return bad(headers, 400, "accountId/gatewayId must be alphanumeric/dash/underscore");
+        }
+        // A route selects a Dynamic Route ("dynamic/<route>"); otherwise a
+        // provider/model string ("openai/gpt-5") passes through.
+        const target =
+          typeof body.route === "string" && body.route.trim()
+            ? `dynamic/${body.route.trim()}`
+            : model;
+        if (!target) return bad(headers, 400, "cf-gateway requires a route or model");
+        const key = userKey || env.GATEWAY_KEY || "";
+        if (!key) return bad(headers, 401, "No API key available for this provider");
+        const gwHeaders: Record<string, string> = {
+          "content-type": "application/json",
+          authorization: `Bearer ${key}`,
+        };
+        const gwToken = (typeof body.gatewayToken === "string" && body.gatewayToken) || env.GATEWAY_TOKEN;
+        if (gwToken) gwHeaders["cf-aig-authorization"] = `Bearer ${gwToken}`;
+        if (body.metadata && typeof body.metadata === "object") {
+          gwHeaders["cf-aig-metadata"] = JSON.stringify(body.metadata);
+        }
+        const r = await fetch(
+          `https://gateway.ai.cloudflare.com/v1/${account}/${gw}/compat/chat/completions`,
+          {
+            method: "POST",
+            headers: gwHeaders,
+            body: JSON.stringify({ model: target, max_tokens: 3000, messages: [{ role: "user", content: prompt }] }),
+          },
+        );
+        if (!r.ok) return bad(headers, 502, `Gateway upstream ${r.status}`);
         const j = (await r.json()) as { choices?: Array<{ message?: { content?: string } }> };
         return new Response(JSON.stringify({ text: j.choices?.[0]?.message?.content ?? "" }), { headers });
       }
