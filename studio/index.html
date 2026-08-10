@@ -1148,6 +1148,7 @@ function renderDesign(){
       <tr><td>High-value judgment work</td><td>Frontier tier, explicitly selected</td><td>Per-team budget cap in AI Gateway</td></tr>
       <tr><td>All users</td><td>—</td><td>${effectiveDailyLimit(c.dailyLimit)} calls/user/day allowance; alerts at 80% of team budget</td></tr>
     </tbody></table></div>
+    <p class="hint" style="margin:0.6rem 0 0">Ship this matrix as an <strong>AI Gateway Dynamic Route</strong> (<code>dynamic/${esc(slug(c.name))}</code>) — conditional task-class branching, per-team Budget/Rate-Limit nodes with cheaper-model fallback, versioned and re-tunable without redeploying Cloudflare OS (Build Guide step 8).</p>
   </div>
 
   <div class="card"><h3>Timeline <span class="tag">~${m.weeks} weeks total</span></h3>
@@ -1278,14 +1279,15 @@ pnpm deploy    # builds and pushes to the client's account
       <li>Dashboard → <strong>AI → AI Gateway → Create gateway</strong> named <code>${esc(sl)}-gw</code>.</li>
       <li>Create an API token: <strong>My Profile → API Tokens → Create</strong> with <strong>AI Gateway Run + Read</strong> permissions on this account.</li>
       <li>${c.provider==="workersai" ? "Using Workers AI only — no external provider keys needed." : `Add the client's ${c.provider==="mix"?"provider keys (Anthropic + OpenAI)":c.provider==="openai"?"OpenAI key":"Anthropic key"} — keys created in the <em>client's</em> provider account, on enterprise/no-training terms, stored in the gateway or as Worker secrets. Never your own keys.`}</li>
-      <li>Set the platform env (via the starter's secrets flow / <code>wrangler secret put</code> for the sensitive ones):</li>
+      <li>Set the platform env (via the starter's secrets flow / <code>wrangler secret put</code> for the sensitive ones) — block below.</li>
     </ol>`,
     code:`ENABLE_CLOUDFLARE_LIMITS=true
 CF_AI_GATEWAY=${sl}-gw
 CF_AI_GATEWAY_ACCOUNT_ID=${c.accountId || "<ACCOUNT ID>"}
 CF_AI_GATEWAY_API_TOKEN=<secret — use wrangler secret put>
 DAILY_LLM_CALL_LIMIT=${effectiveDailyLimit(c.dailyLimit)}`,
-    verify:`Ask the workspace agent anything; the request appears in the AI Gateway logs with attribution. Set a team budget alert at 80%.` });
+    body2:`<div class="note"><b>Implement the model matrix as a Dynamic Route (recommended).</b> Rather than hard-code one model, build the Design tab's matrix as a named, versioned AI Gateway route (e.g. <code>dynamic/${esc(sl)}</code>): <strong>Conditional</strong> nodes branch by task class (from request metadata), <strong>Model</strong> nodes call the chosen provider/model, and <strong>Budget Limit</strong> / <strong>Rate Limit</strong> nodes enforce per-team cost/volume quotas and fall back to a cheaper model when exceeded. Logic lives in the gateway — the governance council re-tunes models and budgets by publishing a new route version, no Cloudflare OS redeploy, instant rollback. The native answer to model-spend drift.</div>`,
+    verify:`Ask the workspace agent anything; the request appears in the AI Gateway logs with attribution. Set a team budget alert at 80%. With a Dynamic Route: a cheap-tier-tagged request resolves to the cheap model, and exceeding a team budget falls back rather than erroring.` });
 
   steps.push({ id:"brand", title:"Branding & announcements",
     body:`<ol>

@@ -137,14 +137,15 @@ pnpm deploy    # builds and pushes to the client's account
         ? "Using Workers AI only — no external provider keys needed."
         : `Add the client's ${c.provider === "mix" ? "provider keys (Anthropic + OpenAI)" : c.provider === "openai" ? "OpenAI key" : "Anthropic key"} — created in the *client's* provider account, on enterprise/no-training terms, stored in the gateway or as Worker secrets. Never your own keys.`
     }
-4. Set the platform env (secrets via the starter's secrets flow / \`wrangler secret put\`):`,
+4. Set the platform env (secrets via the starter's secrets flow / \`wrangler secret put\`) — see the block below.
+5. **Implement the model matrix as a Dynamic Route (recommended).** Rather than hard-code one model, build Section 2's matrix as a named, versioned AI Gateway route (e.g. \`dynamic/${sl}\`): **Conditional** nodes branch by task class (from request metadata), **Model** nodes call the chosen provider/model, and **Budget Limit** / **Rate Limit** nodes enforce per-team cost/volume quotas and fall back to a cheaper model when exceeded. Logic lives in the gateway, so the governance council re-tunes models and budgets by publishing a new route version — no Cloudflare OS redeploy — with instant rollback. This is the native answer to model-spend drift.`,
     code: `ENABLE_CLOUDFLARE_LIMITS=true
 CF_AI_GATEWAY=${sl}-gw
 CF_AI_GATEWAY_ACCOUNT_ID=${ph(c.accountId, "<ACCOUNT ID>")}
 CF_AI_GATEWAY_API_TOKEN=<secret — use wrangler secret put>
 DAILY_LLM_CALL_LIMIT=${effectiveDailyLimit(c.dailyLimit)}`,
     verify:
-      "Ask the workspace agent anything; the request appears in AI Gateway logs with attribution. Set a team budget alert at 80%.",
+      "Ask the workspace agent anything; the request appears in AI Gateway logs with attribution. Set a team budget alert at 80%. If using a Dynamic Route, a cheap-tier-tagged request resolves to the cheap model, and exceeding a team budget falls back rather than erroring.",
   });
 
   steps.push({
