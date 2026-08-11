@@ -24,8 +24,15 @@ describe("generateFiles", () => {
     expect(wf.sort()).toEqual(["workflows/draft-personalized-repli.md", "workflows/weekly-engagement-status.md"]);
   });
 
+  it("emits the promptfoo harness alongside the eval suites", () => {
+    const pf = files.find((f) => f.path === "evals/promptfooconfig.yaml")!;
+    expect(pf).toBeTruthy();
+    expect(pf.content).toContain("npx promptfoo eval");
+    expect(pf.content).toContain("type: llm-rubric");
+  });
+
   it("emits one eval suite per pilot plus the platform suite, all valid JSON", () => {
-    const evalFiles = files.filter((f) => f.path.startsWith("evals/"));
+    const evalFiles = files.filter((f) => f.path.startsWith("evals/") && f.path.endsWith(".json"));
     expect(evalFiles).toHaveLength(5); // platform + 4 pilots
     for (const f of evalFiles) expect(() => JSON.parse(f.content)).not.toThrow();
   });

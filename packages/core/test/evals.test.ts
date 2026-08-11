@@ -57,6 +57,32 @@ describe("evalSuites", () => {
   });
 });
 
+describe("promptfooConfig", () => {
+  it("emits valid provider/prompts/tests structure with one llm-rubric per case", async () => {
+    const { promptfooConfig } = await import("../src/evals.js");
+    const yaml = promptfooConfig(hqClient());
+    expect(yaml).toContain("prompts:");
+    expect(yaml).toContain("providers:");
+    expect(yaml).toContain("tests:");
+    const cases = evalSuites(hqClient()).flatMap((s) => s.cases).length;
+    expect((yaml.match(/type: llm-rubric/g) ?? []).length).toBe(cases);
+    // the red-team scope-exceed case's prompt is present and JSON-encoded (safe)
+    expect(yaml).toContain("[redteam/blocker] Scope exceed is refused");
+  });
+
+  it("JSON-encodes rubric values so quotes/newlines can't break the YAML", async () => {
+    const { promptfooConfig } = await import("../src/evals.js");
+    const c = hqClient();
+    // HQ's B-risk pilots route to the sends approver, so the tricky string lands in an `expected`.
+    c.approvers = { payments: "P", sends: 'A"B\nC', records: "R" };
+    const yaml = promptfooConfig(c);
+    // a naive emit would break the YAML; JSON-encoding keeps it single-line/escaped
+    expect(yaml).toContain('A\\"B\\nC');
+    // the raw newline must NOT appear literally inside a value (it's escaped to \n)
+    expect(yaml).not.toContain("A\"B\nC");
+  });
+});
+
 describe("evalRunMarkdown", () => {
   it("states the counts, the exit bar, and the results log", () => {
     const md = evalRunMarkdown(hqClient());

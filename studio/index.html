@@ -721,6 +721,7 @@ function renderDiscovery(){
     <h3>Survey <span class="tag">send this to all staff; paste themes back below</span></h3>
     <div class="codeblock"><pre id="surveyPre"></pre><button class="copy" id="btnCopySurvey">Copy</button></div>
     <div class="field"><label>Aggregated survey themes / diagram &amp; artifact notes</label><textarea id="f-surveyNotes" rows="4" placeholder="Themes from responses; links to process diagrams, org charts, photos of whiteboards…">${esc(c.surveyNotes)}</textarea></div>
+    <p class="hint" style="margin:0.4rem 0 0">Have discovery-call recordings? Transcribe them with <strong>Cloudflare Workers AI Whisper</strong> (stays in-ecosystem) and paste the transcript here — it joins interviews + inbox as evidence for the AI-assist synthesis.</p>
   </div>
 
   <div class="card">
