@@ -358,7 +358,7 @@ flowchart LR
         <tr><td>Core OS</td><td>Pinned <code>cloudflare-os</code> release via <code>cloudflare-os-starter</code></td><td>Branding via <code>/admin</code> (no redeploy); infra changes via <code>deployment.jsonc</code> (redeploy). Starter requires Node 24 + pnpm 11</td></tr>
         <tr><td>Integrations</td><td>Stock Gatekeepers + custom Gatekeepers in <code>packages/custom-gatekeeper</code></td><td>Each custom Gatekeeper is its own Worker with service bindings — separately deployable and testable</td></tr>
         <tr><td>MCP integrations</td><td>Vendor remote MCP servers via <strong>MCP Server Portals</strong> (Cloudflare One AI controls)</td><td>Config-first path when the vendor already publishes an MCP server: SSO-gated, per-tool scoped, logged — no code to maintain</td></tr>
-        <tr><td>Knowledge</td><td>R2 + AI Search (hybrid retrieval), Notion/Confluence Gatekeepers, skills library</td><td>Skills files are versioned like code — treat them as the client's process IP</td></tr>
+        <tr><td>Knowledge</td><td>R2 + <strong>AI Search</strong> (formerly AutoRAG — fully managed RAG over R2 + Vectorize; MCP-queryable), Notion/Confluence Gatekeepers, skills library</td><td>Skills files are versioned like code — treat them as the client's process IP</td></tr>
         <tr><td>Private reach</td><td>Cloudflare Mesh / Tunnel for on-prem systems</td><td>How agents reach an ERP, MES, or DMS that never touches the public internet</td></tr>
         <tr><td>Ops</td><td>Error-reporting Worker, logs/traces per observability guide</td><td>Ships in the starter; wire to the client's log destination</td></tr>
       </tbody>
@@ -379,6 +379,7 @@ flowchart LR
       <li><strong>Neither</strong> → custom Gatekeeper from the practice library.</li>
     </ol>
     <p>Where custom Gatekeepers still win even when an MCP server exists: your own approval-queue semantics on side-effectful tools, tight typed scoping (per-matter, per-realm, minimum-necessary PHI), on-prem reach via Tunnel, and policy that belongs to <em>you</em> rather than the vendor's tool surface. Rule of thumb: <strong>MCP for reads and vendor-maintained breadth; Gatekeepers for writes, walls, and anything the client must be able to audit on their own terms.</strong> Price portal connections like stock-gatekeeper config, not like builds.</p>
+    <p><strong>Cloudflare's own remote MCP servers</strong> (one OAuth endpoint at <code>mcp.cloudflare.com/mcp</code> — Docs, observability/logs, Browser Rendering, Radar, Workers Builds) are the cleanest first portal example, and doubly useful <em>inside your own OS</em>: connect the <strong>Docs</strong> and <strong>observability</strong> servers so your delivery agents have current Cloudflare reference and can query Workers logs while building or upgrading a deployment.</p>
   </div>
 </section>
 
@@ -849,7 +850,7 @@ flowchart LR
     <div class="faq-item"><h4>Do AI providers train on our data?</h4>
       <p>All model traffic routes through your AI Gateway to the endpoints we configure — enterprise/no-training terms, selected per your policy. The model matrix is yours to change at any time without redeployment.</p></div>
     <div class="faq-item"><h4>What stops an agent from doing something it shouldn't?</h4>
-      <p>Agents start with access to nothing; every capability is an explicit grant through a Gatekeeper that scopes resources, logs every read, and queues side effects (sends, payments, filings) behind named human approvers. App servers run with outbound networking disabled.</p></div>
+      <p>Agents start with access to nothing; every capability is an explicit grant through a Gatekeeper that scopes resources, logs every read, and queues side effects (sends, payments, filings) behind named human approvers. App servers run with outbound networking disabled. At the model layer, <strong>AI Gateway Guardrails</strong> inspect every prompt and response for prompt injection, PII, and unsafe content and flag or block them — a runtime control on top of the pre-pilot red-team evals.</p></div>
     <div class="faq-item"><h4>Can an employee leak data by sharing a workspace or app?</h4>
       <p>The platform records every resource an agent observed; when someone opens shared work, Gatekeepers verify <em>that person's</em> access to each observed resource — against the viewer's <em>own</em> connected accounts, re-checked on every open so revoked access is caught promptly. Collaborators use their own model budgets and their own third-party connections. Share links are stored hashed and are revocable, with live sessions cut on revocation.</p></div>
     <div class="faq-item"><h4>What's the license, and what do we own?</h4>

@@ -1204,6 +1204,7 @@ function buildSteps(){
   const c = C();
   const host = hostnameFor(c), stag = stagingFor(c), sl = slug(c.name);
   const admins = c.adminEmails || "you@yourfirm.com";
+  const regulated = c.vertical === "law" || c.vertical === "finserv" || c.vertical === "pt";
   const steps = [];
 
   steps.push({ id:"prereq", title:"Prepare your machine",
@@ -1309,7 +1310,8 @@ CF_AI_GATEWAY=${sl}-gw
 CF_AI_GATEWAY_ACCOUNT_ID=${c.accountId || "<ACCOUNT ID>"}
 CF_AI_GATEWAY_API_TOKEN=<secret — use wrangler secret put>
 DAILY_LLM_CALL_LIMIT=${effectiveDailyLimit(c.dailyLimit)}`,
-    body2:`<div class="note"><b>Implement the model matrix as a Dynamic Route (recommended).</b> Rather than hard-code one model, build the Design tab's matrix as a named, versioned AI Gateway route (e.g. <code>dynamic/${esc(sl)}</code>): <strong>Conditional</strong> nodes branch by task class (from request metadata), <strong>Model</strong> nodes call the chosen provider/model, and <strong>Budget Limit</strong> / <strong>Rate Limit</strong> nodes enforce per-team cost/volume quotas and fall back to a cheaper model when exceeded. Logic lives in the gateway — the governance council re-tunes models and budgets by publishing a new route version, no Cloudflare OS redeploy, instant rollback. The native answer to model-spend drift.</div>`,
+    body2:`<div class="note"><b>Implement the model matrix as a Dynamic Route (recommended).</b> Rather than hard-code one model, build the Design tab's matrix as a named, versioned AI Gateway route (e.g. <code>dynamic/${esc(sl)}</code>): <strong>Conditional</strong> nodes branch by task class (from request metadata), <strong>Model</strong> nodes call the chosen provider/model, and <strong>Budget Limit</strong> / <strong>Rate Limit</strong> nodes enforce per-team cost/volume quotas and fall back to a cheaper model when exceeded. Logic lives in the gateway — the governance council re-tunes models and budgets by publishing a new route version, no Cloudflare OS redeploy, instant rollback. The native answer to model-spend drift.</div>
+    <div class="${regulated?"warnbox":"note"}"><b>Enable Guardrails on the gateway${regulated?" — REQUIRED for this vertical":""}.</b> AI Gateway Guardrails inspect prompts <em>and</em> responses in real time for <strong>prompt injection, PII, and unsafe content</strong> (hate/violence/sexual) and <strong>flag or block</strong> per your settings, all logged for audit. Since every Cloudflare OS model call flows through this gateway, it's one runtime control covering all agents — complementing the pre-pilot red-team evals${regulated?"; turn blocking on for PII and injection":""}.</div>`,
     verify:`Ask the workspace agent anything; the request appears in the AI Gateway logs with attribution. Set a team budget alert at 80%. With a Dynamic Route: a cheap-tier-tagged request resolves to the cheap model, and exceeding a team budget falls back rather than erroring.` });
 
   steps.push({ id:"brand", title:"Branding & announcements",
@@ -1341,7 +1343,6 @@ DAILY_LLM_CALL_LIMIT=${effectiveDailyLimit(c.dailyLimit)}`,
       verify:`A test event fires the Workflow; a forged request is rejected; the workspace hostname still demands login everywhere.` });
   }
 
-  const regulated = c.vertical === "law" || c.vertical === "finserv" || c.vertical === "pt";
   steps.push({ id:"hardening", title:"Harden & instrument the platform",
     body:`<p>Four small settings that separate a demo from an operated deployment:</p>
     <ol>
@@ -1360,6 +1361,7 @@ DAILY_LLM_CALL_LIMIT=${effectiveDailyLimit(c.dailyLimit)}`,
       <li>Check whether the vendor publishes an official remote MCP server (their developer docs, or the MCP registries).</li>
       <li>If yes: Zero Trust dashboard → <strong>AI controls → MCP servers</strong> → add the server URL and its auth, group servers into a <strong>Portal</strong>, and scope which tools each user group may call. Configuration, not code — the vendor maintains the integration.</li>
       <li>Prefer a custom Gatekeeper anyway when you need your own approval-queue semantics on side effects, tight typed scoping (per-matter, per-realm, minimum-necessary PHI), or on-prem reach via Tunnel.</li>
+      <li><strong>Cloudflare's own remote MCP servers</strong> (one OAuth endpoint, <code>mcp.cloudflare.com/mcp</code>) help <em>operate</em> the deployment: the <strong>Docs</strong> server gives agents current Cloudflare reference, and the <strong>observability/logs</strong> server lets them query Workers logs when debugging a build or upgrade. Also the cleanest first example of a portal-connected vendor server.</li>
     </ol>
     <div class="note"><b>Rule of thumb:</b> MCP for reads and vendor-maintained breadth; Gatekeepers for writes, walls, and client-owned audit policy. Price portal connections like stock-gatekeeper config, not like builds.</div>`,
     verify:`For each system below you can say which path it uses and why; portal-connected tools appear for a pilot user, disallowed tools are absent, and calls show in the portal's logs.` });
@@ -1482,9 +1484,9 @@ export class HubspotGatekeeper {
   const kn = c.knowledge || [];
   if (kn.some(k => k.type !== "wiki" && k.type !== "templates" && k.type !== "data")) {
     steps.push({ id:"aisearch", title:"Stand up AI Search over the knowledge bucket",
-      body:`<p>Document-type knowledge retrieves through AI Search (embeddings-based hybrid retrieval) — create it before the knowledge step can mean anything.</p>
+      body:`<p>Document-type knowledge retrieves through <strong>AI Search</strong> (formerly AutoRAG) — Cloudflare's fully managed RAG over R2 + Vectorize + Workers AI embeddings, queryable from a Workers binding, the REST API, or its own MCP server. Create it before the knowledge step can mean anything.</p>
       <ol>
-        <li>Dashboard → <strong>AI → AI Search → create an instance</strong> (click-paths per the current dashboard); connect the deployment's <strong>R2 bucket</strong> as the data source.</li>
+        <li>Dashboard → <strong>AI → AI Search → create an instance</strong> (click-paths per the current dashboard); connect the deployment's <strong>R2 bucket</strong> as the data source. AI Search auto-manages embeddings, indexing, and retrieval — no pipeline to build.</li>
         <li>Accept the default embedding model unless the corpus is unusual; note the choice in the security baseline.</li>
         <li>Upload a starter batch of SOPs and let it index; set re-index behavior for new uploads.</li>
         <li>Agree corpus conventions: one owner per document, a "current as of" line, quarterly staleness review.</li>
