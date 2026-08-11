@@ -16,7 +16,14 @@ describe("generateFiles", () => {
     expect(paths).toContain("EVALS.md");
     expect(paths).toContain("METRICS.md");
     expect(paths).toContain("SECURITY-BASELINE.md");
+    expect(paths).toContain("COMPLIANCE.md");
     expect(paths).toContain("README.md");
+  });
+
+  it("COMPLIANCE.md carries the vertical framework and the disclaimer", () => {
+    const comp = files.find((f) => f.path === "COMPLIANCE.md")!;
+    expect(comp.content).toContain("processor"); // HQ is the agency vertical
+    expect(comp.content).toContain("NOT legal advice");
   });
 
   it("emits workflow specs for cadenced pilots only", () => {

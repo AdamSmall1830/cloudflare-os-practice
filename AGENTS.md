@@ -8,7 +8,7 @@ You are working in the **Cloudflare OS Practice** repo: the delivery toolkit a c
 Studio (web app, planning cockpit)          ← captures discovery, generates design + build guide
    │  Export → cfos-<client>.json           ← ONE data structure: the ClientRecord
    ▼
-cfos-scaffold CLI                           ← ClientRecord → deployment kit (19 files for HQ)
+cfos-scaffold CLI                           ← ClientRecord → deployment kit (21 files for HQ)
    │  deployment.jsonc · SETUP.md · gatekeeper scaffolds · skills · evals · workflows · metrics · security baseline
    ▼
 cloudflare/cloudflare-os-starter (clone)    ← the kit is copied into this; pnpm deploy pushes it
@@ -80,6 +80,8 @@ aiCritiquePrompt(client, draftJson) // → pass-2 skeptical evidence check; retu
 parseAiSuggestions(raw, existing) // → validated use cases (fence-stripping, clamping, cadence/risk whitelists, dedupe, 15 cap)
 evalSuites(client)         // → platform red-team suite (6 blockers) + golden suites per pilot; evalRunMarkdown() = protocol
 workflowSpecs(client)      // → pattern-instantiated specs for cadenced pilots (patterns: docs/workflow-patterns.md)
+promptfooConfig(client)    // → promptfooconfig.yaml: eval cases as llm-rubric tests (model-layer regression runner)
+complianceProfiles(client) / complianceMarkdown(client) // → per-vertical control→requirement mapping (HIPAA/SEC/bar/privacy); COMPLIANCE.md. A mapping aid, not legal advice.
 hqClient() / blankClient(name)  // seeds; hqClient() is the firm's own record and the main test fixture
 ```
 

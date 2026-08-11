@@ -41,7 +41,7 @@ console.log(scopeMarkdown(design));      // proposal-ready markdown
 console.log(buildSteps(client).length);  // ordered setup steps with acceptance checks
 ```
 
-To turn a Studio export into a full deployment kit — filled `deployment.jsonc`, the numbered `SETUP.md`, gatekeeper scaffolds (custom builds only; MCP-routed systems get portal steps instead), skill seeds, eval suites + run protocol, workflow specs for cadenced pilots, the pilot metrics log, and the security baseline:
+To turn a Studio export into a full deployment kit — filled `deployment.jsonc`, the numbered `SETUP.md`, gatekeeper scaffolds (custom builds only; MCP-routed systems get portal steps instead), skill seeds, eval suites + run protocol + a promptfoo runner, workflow specs for cadenced pilots, the pilot metrics log, the security baseline, and a per-vertical compliance mapping (`COMPLIANCE.md`):
 
 ```bash
 pnpm scaffold examples/hq-export.json    # try it immediately with the bundled example

@@ -297,6 +297,17 @@ const VERTICALS = {
 };
 
 const RISK_LABEL = { A:"A · read-only", B:"B · write + approval", C:"C · external side effects" };
+// Compliance framework per vertical (mirrors packages/core/src/compliance.ts). The full
+// control→requirement mapping is generated as COMPLIANCE.md by the scaffold; this is the summary.
+const COMPLIANCE_FW = {
+  pt: { framework:"HIPAA (45 CFR Parts 160 & 164)", scope:"The deployment touches Protected Health Information (PHI)." },
+  finserv: { framework:"SEC — Investment Advisers Act of 1940", scope:"Trading and money movement stay outside the OS by design." },
+  law: { framework:"Rules of Professional Conduct (ABA Model Rules — verify your jurisdiction's adopted version)", scope:"Confidentiality, conflicts, and supervision of nonlawyer assistance." },
+  salesmkt: { framework:"Commercial communications & consumer privacy", scope:"Outbound messaging (CAN-SPAM/TCPA) and consumer data (CCPA/GDPR)." },
+  manufacturing: { framework:"Quality records & (where applicable) export control", scope:"ISO 9001 records; ITAR/EAR technical data if applicable." },
+  agency: { framework:"Service-provider / processor obligations (the firm's own posture)", scope:"DPAs with clients; BAA where client PHI is touched." },
+  other: { framework:"Baseline data protection & security", scope:"DPA, access & audit, content safety." }
+};
 
 /* =============================== state =============================== */
 const LS_KEY = "cfos-studio-v1";
@@ -1105,6 +1116,7 @@ ${(c.knowledge||[]).map(k=>{
 - Models: ${c.provider} via AI Gateway; ${effectiveDailyLimit(c.dailyLimit)} calls/user/day allowance; per-team budgets
 - Approvals: payments → ${c.approvers.payments||"TBD"}; outbound sends → ${c.approvers.sends||"TBD"}; records/filings → ${c.approvers.records||"TBD"}
 - Vertical guardrails: ${VERTICALS[c.vertical].guard}
+- Compliance framework: ${(COMPLIANCE_FW[c.vertical]||COMPLIANCE_FW.other).framework} — control→requirement mapping ships as COMPLIANCE.md (review with counsel; not legal advice)
 
 ## Timeline
 ~${m.weeks} weeks: Discovery ${m.small?2:3}w → Foundation 1w → Integrations ${m.intWeeks}w (knowledge curation in parallel) → Pilot 3w → Rollout ${Number(c.size)>100?4:3}w → Handoff 2w.
@@ -1174,6 +1186,13 @@ function renderDesign(){
     </tbody></table></div>
     <p class="hint" style="margin:0.6rem 0 0">Ship this matrix as an <strong>AI Gateway Dynamic Route</strong> (<code>dynamic/${esc(slug(c.name))}</code>) — conditional task-class branching, per-team Budget/Rate-Limit nodes with cheaper-model fallback, versioned and re-tunable without redeploying Cloudflare OS (Build Guide step 8).</p>
   </div>
+
+  ${(()=>{ const cf = COMPLIANCE_FW[c.vertical] || COMPLIANCE_FW.other; const reg = c.vertical==="pt"||c.vertical==="finserv"||c.vertical==="law";
+    return `<div class="card"><h3>Compliance mapping <span class="tag">${esc(cf.framework.split(" (")[0].split(" —")[0])}${reg?" · regulated":""}</span></h3>
+    <p style="margin:0 0 0.4rem"><strong>${esc(cf.framework)}</strong> — ${esc(cf.scope)}</p>
+    <p class="hint" style="margin:0 0 0.4rem">The full <strong>control → requirement</strong> mapping (each control this deployment ships matched to the rule it satisfies, with human sign-offs) generates as <strong>COMPLIANCE.md</strong> in the deployment kit (scaffold). ${reg?"For this regulated vertical it's a first-meeting trust asset — bring it to the client's counsel/compliance owner.":"Baseline data-protection mapping; expand if the client has sector rules."}</p>
+    <div class="warnbox" style="margin:0">A mapping aid to structure the compliance conversation — <strong>not legal advice</strong>. Verify citations with the client's counsel against their facts and current regulations.</div>
+  </div>`; })()}
 
   <div class="card"><h3>Timeline <span class="tag">~${m.weeks} weeks total</span></h3>
     <div class="tbl"><table><thead><tr><th>Phase</th><th>Weeks</th></tr></thead><tbody>

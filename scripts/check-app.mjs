@@ -75,6 +75,7 @@ const MIRROR_PINS = [
   ["AI evidence schema", '"evidence":"short quote/pointer from the corpus"'],
   ["two-pass critique prompt", "function aiCritiquePrompt("],
   ["slug trailing-hyphen re-strip", '.slice(0,24).replace(/-+$/,"")'],
+  ["compliance framework map (HIPAA)", "HIPAA (45 CFR Parts 160 & 164)"],
 ];
 for (const [label, needle] of MIRROR_PINS) {
   must(studio.includes(needle), `Studio contains the ${label}`);

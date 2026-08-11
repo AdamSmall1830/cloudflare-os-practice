@@ -544,7 +544,7 @@ flowchart LR
     <div class="phase-body">
       <h3>Handoff &amp; operations</h3>
       <p>Transfer ownership deliberately against the signable acceptance checklist in Section 08. Admin training covers <code>deployment.jsonc</code>, Access policy, AI Gateway budgets, Gatekeeper credential rotation, and the <strong>upgrade runbook</strong>: monthly pinned-release bumps tested in staging before production — non-negotiable while upstream is in heavy development. Establish a client-side governance council (sponsor + IT + one champion per department) that owns the policy matrix, model budgets, and the skills backlog. Rotate every credential you touched. Agree the support tier: full handoff, or managed service.</p>
-      <div class="kv"><b>Deliverables</b> Admin &amp; ops runbooks, upgrade calendar, governance charter, metrics dashboard, 30/60/90-day adoption plan, signed acceptance checklist, support agreement.</div>
+      <div class="kv"><b>Deliverables</b> Admin &amp; ops runbooks, upgrade calendar, governance charter, metrics dashboard, 30/60/90-day adoption plan, signed acceptance checklist, the <strong>compliance pre-flight</strong> (control→requirement mapping reviewed with the client's counsel), support agreement.</div>
       <div class="kv exit"><b>Exit criteria</b> Every item on the acceptance checklist demonstrated, not promised.</div>
     </div>
   </div>
@@ -858,7 +858,7 @@ flowchart LR
     <div class="faq-item"><h4>What if Cloudflare abandons the project?</h4>
       <p>The pinned release keeps running regardless — nothing phones home. The runtime (<code>workerd</code>) is open source, and the platform can be self-hosted on it. Your exit path exists on day one.</p></div>
     <div class="faq-item"><h4>Is this HIPAA / SEC ready?</h4>
-      <p>The architecture supports it — scoped access, audit logs, approval gates, retention export — but paperwork must precede PHI/PII: BAA or DPA with Cloudflare and with each model provider, verified per current terms during Phase 0. Your professionals remain accountable for outputs; the platform makes that accountability auditable.</p></div>
+      <p>The architecture supports it — scoped access, audit logs, approval gates, retention export — but paperwork must precede PHI/PII: BAA or DPA with Cloudflare and with each model provider, verified per current terms during Phase 0. Your professionals remain accountable for outputs; the platform makes that accountability auditable. Each deployment ships a generated <strong>compliance pre-flight</strong> mapping every control to the specific requirement it satisfies (HIPAA / SEC Advisers Act / bar rules / privacy) — a structuring aid to review with the client's counsel, not legal advice.</p></div>
   </div>
 </section>
 

@@ -14,6 +14,7 @@ src/build-guide.ts  buildSteps, buildGuideMarkdown, deploymentJsonc, gatekeeperS
 src/ai.ts           aiPrompt (pass-1 draft), aiCritiquePrompt (pass-2 evidence check), parseAiSuggestions
 src/evals.ts        evalSuites (platform red-team + golden per pilot), evalRunMarkdown
 src/workflows.ts    workflowSpecs, workflowSpecMarkdown, suggestedPattern (docs/workflow-patterns.md)
+src/compliance.ts   complianceProfiles, complianceMarkdown, complianceSummary (per-vertical control→requirement mapping)
 src/seed.ts         blankClient, hqClient (the firm's own HQ record — the main test fixture)
 ```
 
