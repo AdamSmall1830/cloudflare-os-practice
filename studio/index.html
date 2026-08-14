@@ -1704,6 +1704,7 @@ const BP_CSS = `
 function blueprintBuild(){
   const c = C();
   const m = designModel();
+  const eco = ecosystemModel(m);
   const steps = buildSteps();
   const date = new Date().toISOString().slice(0,10);
   const host = hostnameFor(c);
@@ -1746,6 +1747,14 @@ function blueprintBuild(){
     <div class="bp-stat"><b>~${m.weeks}w</b><span>to full handoff</span></div>
   </div>
   <p class="hint">Integrations key: s = stock gatekeeper · p = vendor MCP server via portal · b = custom gatekeeper build.</p>
+
+  <h3>Your AI ecosystem</h3>
+  <p>The most common question we hear — <em>"how do we use powerful AI that knows our business, without handing our data to anyone?"</em> — is answered by assembling what ${c.name?`${esc(c.name)} already has`:"you already have"} into one governed system. Three layers feed it:</p>
+  <table><thead><tr><th>Layer</th><th>Captured</th><th>How it enters the AI team</th></tr></thead><tbody>
+    ${eco.layers.map(l=>`<tr><td><strong>${esc(l.title)}</strong> — ${esc(l.gloss)}</td><td>${l.items.length?esc(l.items.join(", ")):"—"}</td><td>${esc(l.route)}</td></tr>`).join("")}
+  </tbody></table>
+  <p>Each layer feeds <strong>an agent + workspace for every person</strong>, which produces ${esc(eco.outputs)}.</p>
+  <div class="note"><b>Governed frame:</b> ${eco.governance.map(g=>esc(g)).join(" · ")}</div>
 
   <h2 class="bp-break">Design objectives</h2>
   <h3>Pilot charter — the workflows that prove value</h3>
