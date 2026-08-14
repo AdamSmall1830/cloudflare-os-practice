@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { designModel, hostnameFor, scopeMarkdown, stagingFor } from "../src/design.js";
+import { designModel, ecosystemModel, hostnameFor, scopeMarkdown, stagingFor } from "../src/design.js";
 import { blankClient, hqClient } from "../src/seed.js";
 
 describe("designModel", () => {
@@ -83,6 +83,47 @@ describe("scopeMarkdown", () => {
     const c = blankClient("X Co");
     const md = scopeMarkdown(designModel(c), { date: "2026-08-06" });
     expect(md).toContain("payments → TBD");
+  });
+
+  it("includes the assembled AI-ecosystem summary", () => {
+    const md = scopeMarkdown(designModel(hqClient()), { date: "2026-08-06" });
+    expect(md).toContain("## Your AI ecosystem");
+    expect(md).toContain("**Your methods**");
+    expect(md).toContain("**Your knowledge**");
+    expect(md).toContain("**Your live systems**");
+    expect(md).toContain("an agent + workspace for every person");
+  });
+});
+
+describe("ecosystemModel", () => {
+  it("assembles three layers from captured methods, knowledge, and systems", () => {
+    const eco = ecosystemModel(designModel(hqClient()));
+    expect(eco.layers.map((l) => l.id)).toEqual(["methods", "knowledge", "systems"]);
+    const [methods, knowledge, systems] = eco.layers;
+    expect(methods.items.length).toBeGreaterThan(0); // pilot workflows → Skills
+    expect(knowledge.items).toContain("Delivery playbook (12 sections)");
+    expect(knowledge.route).toContain("R2 + AI Search"); // has SOPs → indexed retrieval
+    expect(systems.items).toContain("GoHighLevel"); // label head, "(CRM …)" stripped
+  });
+
+  it("frames governance from the client's account, sign-in, and approvers", () => {
+    const eco = ecosystemModel(designModel(hqClient()));
+    const gov = eco.governance.join(" ");
+    expect(gov).toContain("own Cloudflare account");
+    expect(gov).toContain("observation trail");
+    expect(gov).toContain("payments → Adam (Principal)");
+    expect(eco.outputs).toContain("in your voice, from your facts");
+  });
+
+  it("stays honest about gaps: flags empty layers, and curation once a hoard exists", () => {
+    const blank = ecosystemModel(designModel(blankClient("X Co")));
+    expect(blank.gaps.some((g) => g.includes("No pilot methods"))).toBe(true);
+    expect(blank.gaps.some((g) => g.includes("No knowledge sources"))).toBe(true);
+    expect(blank.gaps.some((g) => g.includes("No live systems"))).toBe(true);
+
+    const hq = ecosystemModel(designModel(hqClient()));
+    expect(hq.gaps.some((g) => g.includes("No knowledge sources"))).toBe(false);
+    expect(hq.gaps.some((g) => g.toLowerCase().includes("curation"))).toBe(true);
   });
 });
 

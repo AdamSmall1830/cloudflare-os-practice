@@ -1,6 +1,6 @@
 import { SYSTEMS, VERTICALS } from "./catalogs.js";
 import { effectiveDailyLimit, effectiveRate, fmtNum, rankUseCases } from "./scoring.js";
-import type { ClientRecord, DesignModel } from "./types.js";
+import type { ClientRecord, DesignModel, EcosystemModel } from "./types.js";
 
 /** Hostname for the production workspace ("os.<domain>", placeholder when unknown). */
 export function hostnameFor(c: Pick<ClientRecord, "domain">): string {
@@ -70,10 +70,82 @@ export function designModel(client: ClientRecord): DesignModel {
   };
 }
 
+/**
+ * Assemble the client's bespoke AI ecosystem from the design model: the three
+ * feeding layers (methods → Skills, knowledge → retrieval, systems → gatekeepers),
+ * the governance frame around them, and an honest list of what isn't captured yet.
+ * Pure — reorganizes existing design data, computes nothing new.
+ */
+export function ecosystemModel(m: DesignModel): EcosystemModel {
+  const c = m.client;
+  const know = c.knowledge ?? [];
+
+  const methods = {
+    id: "methods" as const,
+    title: "Your methods",
+    gloss: "how your best people do the work",
+    items: m.pilots.map((u) => u.name),
+    route: "written up as agent Skills — repeatable judgment, not a one-off prompt",
+  };
+  const knowledge = {
+    id: "knowledge" as const,
+    title: "Your knowledge",
+    gloss: "the hoard: SOPs, docs, templates, transcripts",
+    items: know.map((k) => k.name),
+    route: know.some((k) => k.type === "sops" || k.type === "other")
+      ? "indexed to R2 + AI Search — grounded answers from your own material"
+      : "read live through gatekeepers — never copied out",
+  };
+  const systems = {
+    id: "systems" as const,
+    title: "Your live systems",
+    gloss: "CRM, books, records — today's reality",
+    items: m.chosen.map((s) => s.label.split(" (")[0] ?? s.label),
+    route: "read live through credential-holding gatekeepers — the agent never sees the keys",
+  };
+
+  const signIn =
+    c.idp === "access" ? "Cloudflare Access + your IdP" : c.idp === "google" ? "Google OAuth" : "password (interim)";
+  const governance = [
+    `runs in ${c.name || "your company"}'s own Cloudflare account — no copy, no shared tenancy`,
+    "who-sees-what enforced on every read (verify-on-share)",
+    `sign-in ${signIn}; every agent read logged to the observation trail`,
+    `external actions wait for a person — payments → ${c.approvers.payments || "TBD"}, sends → ${c.approvers.sends || "TBD"}, records → ${c.approvers.records || "TBD"}`,
+  ];
+
+  const depts = [...new Set(m.pilots.map((u) => u.dept))].filter(Boolean);
+  const outputs = depts.length
+    ? `drafts, answers & prepared actions for ${depts.join(", ")} — in your voice, from your facts`
+    : "drafts, answers & prepared actions — in your voice, from your facts";
+
+  const gaps: string[] = [];
+  if (m.pilots.length === 0)
+    gaps.push("No pilot methods selected yet — pick the workflows worth turning into Skills in Discovery.");
+  if (know.length === 0)
+    gaps.push(
+      "No knowledge sources inventoried yet — agents will know how you work, but not your specific documents. Capture SOPs, wikis and templates in Discovery to ground answers in your material.",
+    );
+  if (m.chosen.length === 0)
+    gaps.push("No live systems connected yet — agents can draft and retrieve, but can't act on today's data.");
+  if (know.length > 0)
+    gaps.push(
+      'Retrieval is only as good as the curation: dedupe, prune stale docs, and stamp each source with an owner and a "current as of" date before go-live.',
+    );
+
+  return { layers: [methods, knowledge, systems], governance, outputs, gaps };
+}
+
 /** Render the proposal-ready scope document as Markdown. */
 export function scopeMarkdown(m: DesignModel, opts?: { date?: string }): string {
   const c = m.client;
   const date = opts?.date ?? new Date().toISOString().slice(0, 10);
+  const eco = ecosystemModel(m);
+  const ecoLayers = eco.layers
+    .map(
+      (l) =>
+        `- **${l.title}** — ${l.gloss}. ${l.items.length ? `Captured: ${l.items.join(", ")}.` : "_None captured yet._"} → _${l.route}_`,
+    )
+    .join("\n");
   const signIn =
     c.idp === "access"
       ? "Cloudflare Access + client IdP"
@@ -87,6 +159,13 @@ _Prepared ${date} · ${VERTICALS[c.vertical].label} · ~${c.size || "?"} employe
 ## Objective
 Deploy Cloudflare OS as a governed AI agent workspace in ${c.name}'s own Cloudflare account: every employee gets an agent grounded in company knowledge, with all external actions mediated by credential-holding Gatekeepers, audit logging, and human approval queues.
 
+## Your AI ecosystem
+The most common question we hear — _"how do we use powerful AI that knows our business, without handing our data to anyone?"_ — answered by assembling what ${c.name || "you"} already ${c.name ? "has" : "have"} into one governed system:
+
+${ecoLayers}
+
+Each layer feeds **an agent + workspace for every person**, which produces ${eco.outputs}. The whole ecosystem sits inside a governance frame — ${eco.governance.join("; ")}.
+${eco.gaps.length ? `\n**Before this is real — honest gaps to close:**\n${eco.gaps.map((g) => `- ${g}`).join("\n")}\n` : ""}
 ## Pilot workflows (${m.pilots.length})
 ${m.noEligiblePilots ? "> ⚠ No eligible pilot workflows: every candidate use case is tier C (external side effects), which is never auto-piloted. Add a read-only or write-behind-approval use case, or manually pilot a de-risked version.\n" : ""}${m.pilots.map((u) => `- **${u.name}** (${u.dept}) — est. ${Math.round(u.hrsMo)} hrs/month recovered · risk tier ${u.risk}`).join("\n") || "- (none)"}
 

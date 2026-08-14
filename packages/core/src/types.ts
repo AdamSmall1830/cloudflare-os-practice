@@ -179,6 +179,35 @@ export interface DesignModel {
   rolloutWeeks: number;
 }
 
+/** One layer of the assembled AI ecosystem: methods, knowledge, or live systems. */
+export interface EcosystemLayer {
+  id: "methods" | "knowledge" | "systems";
+  /** Client-facing label, e.g. "Your methods". */
+  title: string;
+  /** One-line plain-language gloss of what this layer is. */
+  gloss: string;
+  /** The concrete captured items feeding this layer (names). */
+  items: string[];
+  /** How this layer enters the AI team (skills / retrieval / gatekeeper reads). */
+  route: string;
+}
+
+/**
+ * The client's bespoke AI ecosystem, assembled from captured discovery + design
+ * data into the three-layers-plus-governance story: the answer to "how do I use
+ * powerful AI that knows my business, without handing my data to anyone?"
+ */
+export interface EcosystemModel {
+  /** The three feeding layers, in narrative order: methods → knowledge → systems. */
+  layers: EcosystemLayer[];
+  /** The governance frame around everything (account, access, logging, approvals). */
+  governance: string[];
+  /** What the assembled team produces, grounded in the pilot set. */
+  outputs: string;
+  /** Honest gaps: what isn't captured yet, and what that costs — never oversells. */
+  gaps: string[];
+}
+
 /** One step of the generated build guide. Bodies are Markdown. */
 export interface BuildStep {
   id: string;
