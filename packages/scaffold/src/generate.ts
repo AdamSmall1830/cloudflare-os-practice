@@ -66,7 +66,7 @@ Anchor from the design: **~${m.totalHrs} hrs/month ≈ $${fmtNum(m.totalValue)}/
 
 - **Hrs saved:** self-reported by the operator, spot-checked against a timed sample once per week.
 - **Approval latency:** queue-entry → decision. If it exceeds ~4 business hours, fix the approver routing before blaming the agent.
-- **Spend/user:** pull from AI Gateway (attributed per person/team); log monthly below.
+- **Spend/user:** native via AI Gateway identity-aware controls — with the gateway behind Access, each request carries \`cf.user_id\`, so spend limits and log filtering are per authenticated user (no client-side plumbing). Log monthly below.
 
 ## Monthly rollup
 | Month | Hrs saved (sum) | ≈ $ value | Model spend | Net | Weekly active % | Verdict vs anchor |
