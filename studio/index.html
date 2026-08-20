@@ -1841,6 +1841,7 @@ function blueprintBuild(){
   const c = C();
   const m = designModel();
   const eco = ecosystemModel(m);
+  const inf = inferencePlan(c);
   const steps = buildSteps();
   const date = new Date().toISOString().slice(0,10);
   const host = hostnameFor(c);
@@ -1909,6 +1910,12 @@ function blueprintBuild(){
     <tr><td>High-value judgment work</td><td>Frontier tier, explicitly selected</td><td>Per-team budget cap in AI Gateway</td></tr>
     <tr><td>All users</td><td>—</td><td>${effectiveDailyLimit(c.dailyLimit)} calls/user/day allowance; alerts at 80% of budget</td></tr>
   </tbody></table>
+  ${inf.hybrid ? `<h3>Inference topology — ${inf.mode==="self-hosted"?"fully client-hosted":"hybrid (cloud + client-hosted)"}</h3>
+  <p>Every model call flows through AI Gateway, so client-hosted tiers inherit the same budgets, logging, Guardrails, and per-user attribution. Each is served OpenAI-compatible and reached privately over a Cloudflare Tunnel, then routed in the same <code>dynamic/${esc(slug(c.name))}</code> route:</p>
+  <table><thead><tr><th>Client-hosted model</th><th>Engine</th><th>Serves (routing)</th><th>Source</th></tr></thead><tbody>
+    ${inf.selfHosted.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(SELF_HOST_ENGINES[s.engine]||s.engine)}</td><td>${s.drivers.map(d=>esc(SELF_HOST_DRIVERS[d]?SELF_HOST_DRIVERS[d].rule:d)).join("; ")||"—"}</td><td>${s.existing?"already running":"we stand it up"}</td></tr>`).join("")}
+    <tr><td>${inf.cloudTier?"Everything else":"—"}</td><td>${inf.cloudTier?"hosted cloud tier":"—"}</td><td>${inf.cloudTier?"general drafting / judgment work":"no cloud fallback — all work resolves to a self-hosted node"}</td><td>${inf.cloudTier?"hosted API":"—"}</td></tr>
+  </tbody></table>` : ""}
 
   <h2 class="bp-break">The setup walkthrough — ${steps.length} steps</h2>
   <div class="note"><b>How this connects to the Cloudflare account:</b> this document's generator never touches it. Step 1's <code>wrangler login</code> signs the deploy machine in via the browser; <code>pnpm deploy</code> pushes the workspace. When the walkthrough completes, Cloudflare OS is a website at https://${esc(host)} behind Access — that is where your team logs in daily.</div>
