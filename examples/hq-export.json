@@ -12,6 +12,8 @@
     "idp": "access",
     "domainOnCf": "no",
     "provider": "anthropic",
+    "inferenceMode": "cloud",
+    "selfHosted": [],
     "dailyLimit": 200,
     "hourlyRate": 60,
     "systems": [

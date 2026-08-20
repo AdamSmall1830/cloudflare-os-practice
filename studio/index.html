@@ -310,6 +310,15 @@ const VERTICALS = {
 };
 
 const RISK_LABEL = { A:"A · read-only", B:"B · write + approval", C:"C · external side effects" };
+// Self-hosted inference catalog (mirrors packages/core/src/catalogs.ts). vLLM is the reference.
+const SELF_HOST_ENGINES = { vllm:"vLLM", tgi:"Hugging Face TGI", sglang:"SGLang", ollama:"Ollama", other:"Other (OpenAI-compatible)" };
+const SELF_HOST_DRIVERS = {
+  residency: { label:"Data residency", rule:"PII / residency-bound tasks route here — prompts never leave client infrastructure" },
+  compliance:{ label:"Compliance mandate", rule:"Regulated-record tasks route here — inference stays inside the audited boundary" },
+  cost:      { label:"Cost at volume", rule:"High-volume triage / bulk tasks route here — no per-token API fees" },
+  latency:   { label:"Low latency", rule:"Latency-critical interactive tasks route here — no round-trip to a hosted API" },
+  offline:   { label:"Offline / air-gapped", rule:"All tasks can route here — operates with no outbound internet" }
+};
 // Compliance framework per vertical (mirrors packages/core/src/compliance.ts). The full
 // control→requirement mapping is generated as COMPLIANCE.md by the scaffold; this is the summary.
 const COMPLIANCE_FW = {
@@ -327,7 +336,7 @@ const LS_KEY = "cfos-studio-v1";
 let db = load(); save();
 function blankClient(name){
   return { name, vertical:"other", size:"", sponsor:"", itOwner:"", domain:"", accountId:"", audience:"",
-    adminEmails:"", idp:"access", domainOnCf:"yes", provider:"anthropic", dailyLimit:100, hourlyRate:50,
+    adminEmails:"", idp:"access", domainOnCf:"yes", provider:"anthropic", inferenceMode:"cloud", selfHosted:[], dailyLimit:100, hourlyRate:50,
     systems:[], mcpRoutes:{}, knowledge:[], otherSystems:"", interviews:[], inbox:[], surveyNotes:"", artifacts:"",
     useCases:[], approvers:{ payments:"", sends:"", records:"" }, steps:{} };
 }
@@ -436,6 +445,9 @@ function normalizeClient(c){
   const VALID_IDP = ["access","google","password"];
   const VALID_PROVIDER = ["anthropic","openai","mix","workersai"];
   const VALID_KTYPE = ["sops","wiki","templates","data","other"];
+  const VALID_INFMODE = ["cloud","hybrid","self-hosted"];
+  const VALID_ENGINE = ["vllm","tgi","sglang","ollama","other"];
+  const VALID_DRIVER = ["residency","compliance","cost","latency","offline"];
   const A = (x) => Array.isArray(x) ? x : [];
   const O = (x) => (x && typeof x === "object" && !Array.isArray(x)) ? x : {};
   const ap = O(c.approvers);
@@ -448,6 +460,8 @@ function normalizeClient(c){
     idp: pick(c.idp, VALID_IDP, "access"),
     domainOnCf: pick(c.domainOnCf, ["yes","no"], "yes"),
     provider: pick(c.provider, VALID_PROVIDER, "anthropic"),
+    inferenceMode: pick(c.inferenceMode, VALID_INFMODE, "cloud"),
+    selfHosted: A(c.selfHosted).map(s => { s = O(s); return { name: safeStr(s.name, 160), engine: pick(s.engine, VALID_ENGINE, "vllm"), drivers: A(s.drivers).filter(d => VALID_DRIVER.includes(d)), existing: !!s.existing }; }),
     dailyLimit: clampNum(c.dailyLimit, 0, 100000, 100),
     hourlyRate: clampNum(c.hourlyRate, 0, 100000, 50),
     otherSystems: safeStr(c.otherSystems, 400),
@@ -705,6 +719,29 @@ function renderDiscovery(){
   </div>
 
   <div class="card">
+    <h3>Inference &amp; hosting <span class="tag">cloud, self-hosted, or a mix — the model tier behind AI Gateway</span></h3>
+    <p class="hint">Every model call flows through AI Gateway, so a client-hosted model is just another governed tier — reached privately over a Cloudflare Tunnel, it inherits the same budgets, logging, Guardrails, and approvals. Pick the topology; hybrid then becomes a routing decision (which work stays on the client's own hardware, and why).</p>
+    <div class="field" style="max-width:24rem"><label>Inference topology</label><select id="f-inferenceMode">
+      <option value="cloud" ${c.inferenceMode==="cloud"?"selected":""}>Cloud only — hosted APIs / Workers AI</option>
+      <option value="hybrid" ${c.inferenceMode==="hybrid"?"selected":""}>Hybrid — cloud + client-hosted models</option>
+      <option value="self-hosted" ${c.inferenceMode==="self-hosted"?"selected":""}>Self-hosted only — client runs every model</option>
+    </select></div>
+    ${c.inferenceMode!=="cloud" ? `
+    <div class="grid2" style="margin:0.8rem 0 0.5rem">
+      <div class="field"><label>Model name</label><input type="text" id="shName" placeholder="e.g. Llama-3.3-70B — client DC"></div>
+      <div class="field"><label>Serving engine</label><select id="shEngine">${Object.keys(SELF_HOST_ENGINES).map(k=>`<option value="${k}">${esc(SELF_HOST_ENGINES[k])}</option>`).join("")}</select></div>
+    </div>
+    <div class="field" style="margin-bottom:0.5rem"><label>Why self-host (drives routing)</label>
+      <div class="checks">${Object.keys(SELF_HOST_DRIVERS).map(k=>`<label><input type="checkbox" data-shdriver="${k}"> ${esc(SELF_HOST_DRIVERS[k].label)}</label>`).join("")}</div>
+    </div>
+    <label style="display:inline-flex;gap:0.45rem;align-items:center;margin-bottom:0.5rem;font-size:0.88rem"><input type="checkbox" id="shExisting"> Client already runs this endpoint (we integrate, not stand it up)</label>
+    <div><button id="btnAddSh" class="primary">+ Add model</button></div>
+    ${(c.selfHosted||[]).length ? `<div class="tbl" style="margin-top:0.7rem"><table><thead><tr><th>Model</th><th>Engine</th><th>Why (routing)</th><th>Source</th><th></th></tr></thead><tbody>${(c.selfHosted||[]).map((s,i)=>`<tr><td style="white-space:normal">${esc(s.name)||"—"}</td><td>${esc(SELF_HOST_ENGINES[s.engine]||s.engine)}</td><td style="white-space:normal">${s.drivers.map(d=>esc(SELF_HOST_DRIVERS[d]?SELF_HOST_DRIVERS[d].label:d)).join(", ")||"—"}</td><td>${s.existing?"existing":"stand up"}</td><td class="row-actions"><button data-del-sh="${i}" class="danger">✕</button></td></tr>`).join("")}</tbody></table></div>` : '<p class="empty" style="margin-top:0.5rem">No client-hosted model added yet — add one so the design and build guide can route to it.</p>'}
+    ${(()=>{ const inf = inferencePlan(c); return inf.routing.length ? `<div class="note" style="margin-top:0.6rem"><b>Routing preview:</b> ${inf.routing.map(r=>esc(r.rule)).join(" · ")}${inf.cloudTier?" · everything else → the cloud tier":" · no cloud fallback (fully self-hosted)"}</div>` : ""; })()}${(()=>{ const n = inferencePlan(c).notes; return n.length ? `<div class="warnbox" style="margin-top:0.5rem">${n.map(x=>esc(x)).join("<br>")}</div>` : ""; })()}
+    ` : ""}
+  </div>
+
+  <div class="card">
     <h3>Knowledge inventory <span class="tag">the knowledge layer — your hoard, and how it's retrieved</span></h3>
     <p class="hint">This is the <strong>hoard</strong> — the raw pile the agents answer from. It isn't memorised into the model; each source is <em>indexed</em> so an agent pulls the right passage on demand: SOPs/docs → ingested to R2 + AI Search (hybrid retrieval); Wiki → connected live via its gatekeeper; Templates → document/slide templates; Live business data → stays in-system, read through gatekeepers. The cleaner and better-owned each source, the sharper the answers.</p>
     <div class="grid2" style="margin-bottom:0.6rem">
@@ -815,9 +852,9 @@ function wireDiscovery(){
   bind("f-otherSystems","otherSystems"); bind("f-surveyNotes","surveyNotes");
   bind("f-ap-pay","approvers.payments"); bind("f-ap-send","approvers.sends"); bind("f-ap-rec","approvers.records");
   document.getElementById("f-name").addEventListener("change", ()=>{ renderHeader(); });
-  ["f-vertical","f-idp","f-provider","f-domainOnCf"].forEach(id=>{
+  ["f-vertical","f-idp","f-provider","f-domainOnCf","f-inferenceMode"].forEach(id=>{
     const el = document.getElementById(id);
-    el.onchange = () => { c[id.slice(2)] = el.value; save(); render(); };
+    if (el) el.onchange = () => { c[id.slice(2)] = el.value; save(); render(); };
   });
   document.querySelectorAll("[data-sys]").forEach(cb => cb.onchange = () => {
     const id = cb.dataset.sys;
@@ -837,6 +874,16 @@ function wireDiscovery(){
     save(); render();
   };
   document.querySelectorAll("[data-del-kn]").forEach(b => b.onclick = () => { c.knowledge.splice(b.dataset.delKn, 1); save(); render(); });
+  const addSh = document.getElementById("btnAddSh");
+  if (addSh) addSh.onclick = () => {
+    const name = document.getElementById("shName").value.trim();
+    if (!name) { toast("Name the model first"); return; }
+    const drivers = [...document.querySelectorAll("[data-shdriver]:checked")].map(x => x.dataset.shdriver);
+    c.selfHosted = c.selfHosted || [];
+    c.selfHosted.push({ name, engine: document.getElementById("shEngine").value, drivers, existing: document.getElementById("shExisting").checked });
+    save(); render();
+  };
+  document.querySelectorAll("[data-del-sh]").forEach(b => b.onclick = () => { c.selfHosted.splice(b.dataset.delSh, 1); save(); render(); });
   document.getElementById("btnAddIv").onclick = () => { c.interviews.push({ person:"", role:"", date:"", answers:{}, _open:true }); save(); render(); };
   document.querySelectorAll("[data-iv][data-f]").forEach(el => el.addEventListener("input", ()=>{ c.interviews[el.dataset.iv][el.dataset.f] = el.value; save(); }));
   document.querySelectorAll("[data-iv][data-q]").forEach(el => el.addEventListener("input", ()=>{ c.interviews[el.dataset.iv].answers[el.dataset.q] = el.value; save(); }));
@@ -1092,6 +1139,30 @@ function designModel(){
   return { c, chosen, stock, custom, mcpRouted, customBuild, workflows, ranked, pilots, suggested, noEligiblePilots, totalHrs, totalVal, rate, weeks, small, intWeeks };
 }
 
+// Mirror of core inferencePlan(): resolve the inference topology (cloud / hybrid /
+// self-hosted) and the driver-derived routing. Self-hosted tiers front through AI Gateway.
+function inferencePlan(c){
+  const mode = c.inferenceMode || "cloud";
+  const selfHosted = mode === "cloud" ? [] : (c.selfHosted || []);
+  const hybrid = mode !== "cloud" && selfHosted.length > 0;
+  const cloudTier = mode !== "self-hosted";
+  const routing = [], seen = new Set();
+  for (const model of selfHosted){
+    const name = model.name || "client-hosted model";
+    const drivers = model.drivers.length ? model.drivers : ["residency"];
+    for (const d of drivers){
+      const rule = SELF_HOST_DRIVERS[d].rule, key = name+"::"+rule;
+      if (seen.has(key)) continue; seen.add(key);
+      routing.push({ model: name, rule });
+    }
+  }
+  const notes = [];
+  if (mode !== "cloud" && !selfHosted.length) notes.push(`Inference mode is "${mode}" but no client-hosted endpoint is captured yet — add the model (name, engine, why) so the design can route to it.`);
+  if (selfHosted.some(m=>m.engine==="ollama")) notes.push("Ollama is fine for a single-GPU pilot, but for production throughput and KV-cache reuse (LMCache) the reference stack is vLLM.");
+  if (mode === "self-hosted" && selfHosted.length) notes.push("Fully self-hosted: no hosted fallback tier — size the client's GPUs for peak, there is no burst-to-cloud.");
+  return { mode, selfHosted, hybrid, cloudTier, routing, notes };
+}
+
 // Mirror of core ecosystemModel(): assemble the three feeding layers + governance
 // frame from captured design data — the "secure bespoke AI that knows your business" story.
 function ecosystemModel(m){
@@ -1113,6 +1184,8 @@ function ecosystemModel(m){
     `sign-in ${signIn}; every agent read logged to the observation trail`,
     `external actions wait for a person — payments → ${c.approvers.payments||"TBD"}, sends → ${c.approvers.sends||"TBD"}, records → ${c.approvers.records||"TBD"}`,
   ];
+  const inf = inferencePlan(c);
+  if (inf.hybrid) governance.push(`sensitive inference stays on client-operated models (${inf.selfHosted.map(s=>s.name).join(", ")}), fronted by AI Gateway${inf.cloudTier?" alongside the cloud tier":" with no cloud tier"}`);
   const depts = [...new Set(m.pilots.map(u=>u.dept))].filter(Boolean);
   const outputs = depts.length ? `drafts, answers & prepared actions for ${depts.join(", ")} — in your voice, from your facts` : "drafts, answers & prepared actions — in your voice, from your facts";
   const gaps = [];
@@ -1127,6 +1200,15 @@ function scopeMarkdown(m){
   const { c } = m;
   const eco = ecosystemModel(m);
   const ecoLayers = eco.layers.map(l=>`- **${l.title}** — ${l.gloss}. ${l.items.length?`Captured: ${l.items.join(", ")}.`:"_None captured yet._"} → _${l.route}_`).join("\n");
+  const inf = inferencePlan(c);
+  const infSection = inf.hybrid ? `
+## Inference topology
+${inf.mode==="self-hosted"?"Fully client-hosted":"Hybrid (cloud + client-hosted)"} — every model call still flows through AI Gateway, so budgets, logging, Guardrails, and identity controls apply to all tiers. Client-hosted tiers are reached privately over a Cloudflare Tunnel (no public port), registered as OpenAI-compatible providers:
+${inf.selfHosted.map(s=>`- **${s.name}** (${SELF_HOST_ENGINES[s.engine]}${s.existing?", already running":", we stand it up"}) — drivers: ${s.drivers.map(d=>SELF_HOST_DRIVERS[d].label).join(", ")||"—"}`).join("\n")}
+
+Routing (as an AI Gateway Dynamic Route):
+${inf.routing.map(r=>`- ${r.rule} → **${r.model}**`).join("\n")}${inf.cloudTier?"\n- everything else → the hosted cloud tier":"\n- no cloud fallback tier (fully self-hosted)"}
+${inf.notes.length?`\n${inf.notes.map(n=>`> ${n}`).join("\n")}\n`:""}` : "";
   return `# ${c.name} — Cloudflare OS Deployment: Proposed Scope
 _Prepared ${new Date().toISOString().slice(0,10)} · ${VERTICALS[c.vertical].label} · ~${c.size||"?"} employees_
 
@@ -1170,7 +1252,7 @@ ${(c.knowledge||[]).map(k=>{
 - Approvals: payments → ${c.approvers.payments||"TBD"}; outbound sends → ${c.approvers.sends||"TBD"}; records/filings → ${c.approvers.records||"TBD"}
 - Vertical guardrails: ${VERTICALS[c.vertical].guard}
 - Compliance framework: ${(COMPLIANCE_FW[c.vertical]||COMPLIANCE_FW.other).framework} — control→requirement mapping ships as COMPLIANCE.md (review with counsel; not legal advice)
-
+${infSection}
 ## Timeline
 ~${m.weeks} weeks: Discovery ${m.small?2:3}w → Foundation 1w → Integrations ${m.intWeeks}w (knowledge curation in parallel) → Pilot 3w → Rollout ${Number(c.size)>100?4:3}w → Handoff 2w.
 
@@ -1255,6 +1337,16 @@ function renderDesign(){
     <p class="hint" style="margin:0.6rem 0 0">Ship this matrix as an <strong>AI Gateway Dynamic Route</strong> (<code>dynamic/${esc(slug(c.name))}</code>) — conditional task-class branching, per-team Budget/Rate-Limit nodes with cheaper-model fallback, versioned and re-tunable without redeploying Cloudflare OS (Build Guide step 8).</p>
   </div>
 
+  ${(()=>{ const inf = inferencePlan(c); if (!inf.hybrid) return ""; return `<div class="card"><h3>Inference topology <span class="tag">${inf.mode==="self-hosted"?"fully client-hosted":"hybrid — cloud + client-hosted"}</span></h3>
+    <p class="hint" style="margin:0 0 0.5rem">Client-hosted tiers front through the same <code>dynamic/${esc(slug(c.name))}</code> route over a Cloudflare Tunnel, so budgets, logging, Guardrails, and per-user attribution apply to every tier. Hybrid is a routing decision:</p>
+    <div class="tbl"><table><thead><tr><th>Client-hosted model</th><th>Engine</th><th>Serves (routing)</th><th>Source</th></tr></thead><tbody>
+      ${inf.selfHosted.map(s=>`<tr><td style="white-space:normal">${esc(s.name)}</td><td>${esc(SELF_HOST_ENGINES[s.engine]||s.engine)}</td><td style="white-space:normal">${s.drivers.map(d=>esc(SELF_HOST_DRIVERS[d]?SELF_HOST_DRIVERS[d].rule:d)).join("; ")||"—"}</td><td>${s.existing?"already running":"we stand it up"}</td></tr>`).join("")}
+      <tr><td>${inf.cloudTier?"Everything else":"—"}</td><td>${inf.cloudTier?"hosted cloud tier":"—"}</td><td>${inf.cloudTier?"general drafting / judgment work → cloud":"no cloud fallback — all work resolves to a self-hosted node"}</td><td>${inf.cloudTier?"hosted API":"—"}</td></tr>
+    </tbody></table></div>
+    ${inf.notes.length?`<div class="warnbox" style="margin:0.6rem 0 0">${inf.notes.map(n=>esc(n)).join("<br>")}</div>`:""}
+    <p class="hint" style="margin:0.5rem 0 0">The Build Guide adds stand-up, Tunnel, and route-wiring steps for these tiers.</p>
+  </div>`; })()}
+
   ${(()=>{ const cf = COMPLIANCE_FW[c.vertical] || COMPLIANCE_FW.other; const reg = c.vertical==="pt"||c.vertical==="finserv"||c.vertical==="law";
     return `<div class="card"><h3>Compliance mapping <span class="tag">${esc(cf.framework.split(" (")[0].split(" —")[0])}${reg?" · regulated":""}</span></h3>
     <p style="margin:0 0 0.4rem"><strong>${esc(cf.framework)}</strong> — ${esc(cf.scope)}</p>
@@ -1293,6 +1385,7 @@ function buildSteps(){
   const host = hostnameFor(c), stag = stagingFor(c), sl = slug(c.name);
   const admins = c.adminEmails || "you@yourfirm.com";
   const regulated = c.vertical === "law" || c.vertical === "finserv" || c.vertical === "pt";
+  const inf = inferencePlan(c);
   const steps = [];
 
   steps.push({ id:"prereq", title:"Prepare your machine",
@@ -1402,6 +1495,49 @@ DAILY_LLM_CALL_LIMIT=${effectiveDailyLimit(c.dailyLimit)}`,
     <div class="${regulated?"warnbox":"note"}"><b>Enable Guardrails on the gateway${regulated?" — REQUIRED for this vertical":""}.</b> AI Gateway Guardrails inspect prompts <em>and</em> responses in real time for <strong>prompt injection, PII, and unsafe content</strong> (hate/violence/sexual) and <strong>flag or block</strong> per your settings, all logged for audit. Since every Cloudflare OS model call flows through this gateway, it's one runtime control covering all agents — complementing the pre-pilot red-team evals${regulated?"; turn blocking on for PII and injection":""}.</div>
     <div class="note"><b>Per-user attribution is automatic.</b> With the gateway behind Access, AI Gateway stamps each request with the signed-in user as <code>cf.user_id</code> — enabling <strong>per-user spend limits</strong> and <strong>per-user log filtering</strong> with no client-side plumbing, alongside the Dynamic Route's per-team budgets. This is what makes the pilot's spend-per-user metric native.</div>`,
     verify:`Ask the workspace agent anything; the request appears in the AI Gateway logs with attribution. Set a team budget alert at 80%. With a Dynamic Route: a cheap-tier-tagged request resolves to the cheap model, and exceeding a team budget falls back rather than erroring.` });
+
+  if (inf.hybrid) {
+    const first = inf.selfHosted[0];
+    const anyStandUp = inf.selfHosted.some(s=>!s.existing);
+    const wantsLmcache = inf.selfHosted.some(s=>s.engine==="vllm");
+    const infHost = `infer.${c.domain||"client-domain.com"}`;
+    steps.push({ id:"selfhost", title:"Stand up the client-hosted model endpoint",
+      body:`<p>This deployment runs a ${inf.mode==="self-hosted"?"fully self-hosted":"hybrid"} inference topology: ${inf.selfHosted.map(s=>`<strong>${esc(s.name)}</strong> (${SELF_HOST_ENGINES[s.engine]}${s.existing?", already running":""})`).join(", ")}. Each model serves an <strong>OpenAI-compatible</strong> API on the client's own hardware; nothing about the model changes the Cloudflare OS architecture — it becomes just another tier behind AI Gateway.</p>
+      <p>${anyStandUp?"<strong>Serve the model (vLLM reference).</strong> On the client's GPU box (Linux + NVIDIA):":"<strong>Confirm the existing endpoint.</strong> You already have an OpenAI-compatible endpoint — capture its base URL + API key, verify it answers <code>/v1/models</code>, and continue to the Tunnel step."}</p>`,
+      code: anyStandUp ? `# vLLM — OpenAI-compatible server, gated by an API key, bound to localhost
+pip install vllm
+export VLLM_API_KEY=$(openssl rand -hex 24)   # store this as a secret
+vllm serve <model-id> \\
+  --served-model-name ${esc(first.name||"client-model")} \\
+  --api-key "$VLLM_API_KEY" \\
+  --host 127.0.0.1 --port 8000${wantsLmcache?`
+
+# Optional — reuse KV cache across RAG / multi-turn (cuts prefill + time-to-first-token).
+# Install LMCache and run vLLM with its KV connector (current syntax per LMCache's
+# vLLM integration docs — the connector name/flags move between versions):
+#   pip install lmcache
+#   vllm serve ...  --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'`:""}` : undefined,
+      verify:`<code>curl -H "Authorization: Bearer $VLLM_API_KEY" http://127.0.0.1:8000/v1/models</code> on the box lists the served model.` });
+
+    steps.push({ id:"selfhost-tunnel", title:"Expose it to Cloudflare over a private Tunnel",
+      body:`<p>AI Gateway must reach the endpoint, but the GPU box should never open a public port. A <strong>named Cloudflare Tunnel</strong> gives it a stable hostname with no inbound firewall change:</p>`,
+      code:`# On the box (install cloudflared first):
+cloudflared tunnel login
+cloudflared tunnel create ${sl}-inference
+cloudflared tunnel route dns ${sl}-inference ${infHost}
+# Point the tunnel at the local model port (run as a service in production):
+cloudflared tunnel --url http://127.0.0.1:8000 run ${sl}-inference`,
+      verify:`<code>https://${esc(infHost)}/v1/models</code> answers (with the API key) from off the box, while the box has <strong>no</strong> inbound ports open. Add a WAF rate-limit rule on <code>infer.*</code> — it is the only reachable surface of the model.` });
+
+    steps.push({ id:"selfhost-route", title:"Route the self-hosted tier through AI Gateway",
+      body:`<ol>
+        <li>In the <code>dynamic/${esc(sl)}</code> Dynamic Route, add a <strong>Model</strong> node targeting the self-hosted endpoint: OpenAI-compatible base URL <code>https://${esc(infHost)}/v1</code>, auth = the model's API key (stored as a gateway secret, sent as the bearer token).</li>
+        <li>Add a <strong>Conditional</strong> node that routes by task-class metadata to the self-hosted node:<ul>${inf.routing.map(r=>`<li>${esc(r.rule)}</li>`).join("")}</ul></li>
+        <li>${inf.cloudTier?"Everything else falls through to the hosted cloud tier (the Model nodes from the gateway step).":"There is <strong>no</strong> cloud fallback — every task resolves to a self-hosted node (fully self-hosted mode)."}</li>
+        <li>Publish the route version. Re-tuning the split later is a new version — no Cloudflare OS redeploy.</li>
+      </ol>${inf.notes.map(n=>`<div class="note">${esc(n)}</div>`).join("")}`,
+      verify:`A request tagged with a self-hosted task class shows in AI Gateway logs hitting the self-hosted model${inf.cloudTier?"; a cloud-class request still hits the hosted provider":" (and there is no cloud tier)"}; both carry per-user attribution and pass Guardrails.` });
+  }
 
   steps.push({ id:"brand", title:"Branding & announcements",
     body:`<ol>

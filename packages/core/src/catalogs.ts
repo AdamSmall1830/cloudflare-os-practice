@@ -1,4 +1,4 @@
-import type { SystemDef, VerticalDef, RiskTier, VerticalId } from "./types.js";
+import type { SystemDef, VerticalDef, RiskTier, VerticalId, SelfHostEngine, SelfHostDriver } from "./types.js";
 
 /** The ten discovery interview questions. */
 export const INTERVIEW_QUESTIONS: readonly string[] = [
@@ -18,6 +18,27 @@ export const RISK_LABEL: Record<RiskTier, string> = {
   A: "A · read-only",
   B: "B · write + approval",
   C: "C · external side effects",
+};
+
+/** Display labels for self-hosted serving engines. vLLM is the practice reference. */
+export const SELF_HOST_ENGINES: Record<SelfHostEngine, string> = {
+  vllm: "vLLM",
+  tgi: "Hugging Face TGI",
+  sglang: "SGLang",
+  ollama: "Ollama",
+  other: "Other (OpenAI-compatible)",
+};
+
+/**
+ * Each self-hosting driver, with the routing rule it implies. The Design engine
+ * turns a model's drivers into "what runs on the client-hosted tier, and why".
+ */
+export const SELF_HOST_DRIVERS: Record<SelfHostDriver, { label: string; rule: string }> = {
+  residency: { label: "Data residency", rule: "PII / residency-bound tasks route here — prompts never leave client infrastructure" },
+  compliance: { label: "Compliance mandate", rule: "Regulated-record tasks route here — inference stays inside the audited boundary" },
+  cost: { label: "Cost at volume", rule: "High-volume triage / bulk tasks route here — no per-token API fees" },
+  latency: { label: "Low latency", rule: "Latency-critical interactive tasks route here — no round-trip to a hosted API" },
+  offline: { label: "Offline / air-gapped", rule: "All tasks can route here — operates with no outbound internet" },
 };
 
 /** Catalog of gatekeeper targets. `vert` scopes a system to one vertical's UI. */

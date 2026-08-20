@@ -1,6 +1,6 @@
-import { SYSTEMS, VERTICALS } from "./catalogs.js";
+import { SELF_HOST_DRIVERS, SELF_HOST_ENGINES, SYSTEMS, VERTICALS } from "./catalogs.js";
 import { effectiveDailyLimit, effectiveRate, fmtNum, rankUseCases } from "./scoring.js";
-import type { ClientRecord, DesignModel, EcosystemModel } from "./types.js";
+import type { ClientRecord, DesignModel, EcosystemModel, InferencePlan, RoutingRule, SelfHostDriver } from "./types.js";
 
 /** Hostname for the production workspace ("os.<domain>", placeholder when unknown). */
 export function hostnameFor(c: Pick<ClientRecord, "domain">): string {
@@ -71,6 +71,47 @@ export function designModel(client: ClientRecord): DesignModel {
 }
 
 /**
+ * Resolve the client's inference topology: which tiers exist (cloud, self-hosted,
+ * or both) and how work splits across them. Self-hosted endpoints front through
+ * AI Gateway, so hybrid is a routing decision, not a separate architecture.
+ * Pure — derived from the record.
+ */
+export function inferencePlan(client: ClientRecord): InferencePlan {
+  const mode = client.inferenceMode || "cloud";
+  const selfHosted = mode === "cloud" ? [] : (client.selfHosted ?? []);
+  const hybrid = mode !== "cloud" && selfHosted.length > 0;
+  const cloudTier = mode !== "self-hosted";
+
+  const routing: RoutingRule[] = [];
+  const seen = new Set<string>();
+  for (const model of selfHosted) {
+    const name = model.name || "client-hosted model";
+    const drivers = model.drivers.length ? model.drivers : (["residency"] as SelfHostDriver[]);
+    for (const d of drivers) {
+      const rule = SELF_HOST_DRIVERS[d].rule;
+      const key = `${name}::${rule}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      routing.push({ model: name, rule });
+    }
+  }
+
+  const notes: string[] = [];
+  if (mode !== "cloud" && selfHosted.length === 0)
+    notes.push(
+      `Inference mode is "${mode}" but no client-hosted endpoint is captured yet — add the model (name, engine, why) so the design can route to it.`,
+    );
+  if (selfHosted.some((m) => m.engine === "ollama"))
+    notes.push(
+      "Ollama is fine for a single-GPU pilot, but for production throughput and KV-cache reuse (LMCache) the reference stack is vLLM.",
+    );
+  if (mode === "self-hosted" && selfHosted.length > 0)
+    notes.push("Fully self-hosted: no hosted fallback tier — size the client's GPUs for peak, there is no burst-to-cloud.");
+
+  return { mode, selfHosted, hybrid, cloudTier, routing, notes };
+}
+
+/**
  * Assemble the client's bespoke AI ecosystem from the design model: the three
  * feeding layers (methods → Skills, knowledge → retrieval, systems → gatekeepers),
  * the governance frame around them, and an honest list of what isn't captured yet.
@@ -112,6 +153,11 @@ export function ecosystemModel(m: DesignModel): EcosystemModel {
     `sign-in ${signIn}; every agent read logged to the observation trail`,
     `external actions wait for a person — payments → ${c.approvers.payments || "TBD"}, sends → ${c.approvers.sends || "TBD"}, records → ${c.approvers.records || "TBD"}`,
   ];
+  const inf = inferencePlan(c);
+  if (inf.hybrid)
+    governance.push(
+      `sensitive inference stays on client-operated models (${inf.selfHosted.map((s) => s.name).join(", ")}), fronted by AI Gateway${inf.cloudTier ? " alongside the cloud tier" : " with no cloud tier"}`,
+    );
 
   const depts = [...new Set(m.pilots.map((u) => u.dept))].filter(Boolean);
   const outputs = depts.length
@@ -152,6 +198,17 @@ export function scopeMarkdown(m: DesignModel, opts?: { date?: string }): string 
       : c.idp === "google"
         ? "Google OAuth (auth gatekeeper)"
         : "Password (interim)";
+  const inf = inferencePlan(c);
+  const infSection = inf.hybrid
+    ? `
+## Inference topology
+${inf.mode === "self-hosted" ? "Fully client-hosted" : "Hybrid (cloud + client-hosted)"} — every model call still flows through AI Gateway, so budgets, logging, Guardrails, and identity controls apply to all tiers. Client-hosted tiers are reached privately over a Cloudflare Tunnel (no public port), registered as OpenAI-compatible providers:
+${inf.selfHosted.map((s) => `- **${s.name}** (${SELF_HOST_ENGINES[s.engine]}${s.existing ? ", already running" : ", we stand it up"}) — drivers: ${s.drivers.map((d) => SELF_HOST_DRIVERS[d].label).join(", ") || "—"}`).join("\n")}
+
+Routing (as an AI Gateway Dynamic Route):
+${inf.routing.map((r) => `- ${r.rule} → **${r.model}**`).join("\n")}${inf.cloudTier ? "\n- everything else → the hosted cloud tier" : "\n- no cloud fallback tier (fully self-hosted)"}
+${inf.notes.length ? `\n${inf.notes.map((n) => `> ${n}`).join("\n")}\n` : ""}`
+    : "";
 
   return `# ${c.name} — Cloudflare OS Deployment: Proposed Scope
 _Prepared ${date} · ${VERTICALS[c.vertical].label} · ~${c.size || "?"} employees_
@@ -215,7 +272,7 @@ ${(m.client.knowledge ?? [])
 - Models: ${c.provider} via AI Gateway; ${effectiveDailyLimit(c.dailyLimit)} calls/user/day allowance; per-team budgets
 - Approvals: payments → ${c.approvers.payments || "TBD"}; outbound sends → ${c.approvers.sends || "TBD"}; records/filings → ${c.approvers.records || "TBD"}
 - Vertical guardrails: ${VERTICALS[c.vertical].guard}
-
+${infSection}
 ## Timeline
 ~${m.weeks} weeks: Discovery ${m.discoveryWeeks}w → Foundation 1w → Integrations ${m.intWeeks}w (knowledge curation in parallel) → Pilot 3w → Rollout ${m.rolloutWeeks}w → Handoff 2w.
 

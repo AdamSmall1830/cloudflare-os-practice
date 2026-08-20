@@ -16,6 +16,8 @@ export function blankClient(name: string): ClientRecord {
     idp: "access",
     domainOnCf: "yes",
     provider: "anthropic",
+    inferenceMode: "cloud",
+    selfHosted: [],
     dailyLimit: 100,
     hourlyRate: 50,
     systems: [],

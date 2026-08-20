@@ -7,6 +7,31 @@ export type SignInMethod = "access" | "google" | "password";
 /** Model provider strategy routed through AI Gateway. */
 export type ModelProvider = "anthropic" | "openai" | "mix" | "workersai";
 
+/** Inference topology: all-cloud (default), a cloud/self-hosted mix, or fully client-hosted. */
+export type InferenceMode = "cloud" | "hybrid" | "self-hosted";
+
+/** Serving engine for a client-hosted model endpoint. vLLM is the practice reference. */
+export type SelfHostEngine = "vllm" | "tgi" | "sglang" | "ollama" | "other";
+
+/** Why a model tier is self-hosted — drives both routing and the compliance/data-flow story. */
+export type SelfHostDriver = "residency" | "compliance" | "cost" | "latency" | "offline";
+
+/**
+ * A client-operated model endpoint. Fronted by AI Gateway as an OpenAI-compatible
+ * provider and reached privately over a Cloudflare Tunnel, so it inherits the same
+ * budgets, logging, Guardrails, identity controls, and approval queues as cloud tiers.
+ */
+export interface SelfHostedModel {
+  /** Display name, e.g. "Llama-3.3-70B — client DC". */
+  name: string;
+  /** Serving engine; informs the build steps ("vllm" gets exact commands). */
+  engine: SelfHostEngine;
+  /** Why it's self-hosted; each driver implies which task classes route here. */
+  drivers: SelfHostDriver[];
+  /** True when the client already runs this endpoint (we integrate) vs. we stand it up. */
+  existing: boolean;
+}
+
 export type VerticalId =
   | "manufacturing"
   | "law"
@@ -116,6 +141,10 @@ export interface ClientRecord {
   idp: SignInMethod;
   domainOnCf: "yes" | "no";
   provider: ModelProvider;
+  /** Inference topology: all-cloud (default), hybrid, or fully client-hosted. */
+  inferenceMode: InferenceMode;
+  /** Client-operated model endpoints (OpenAI-compatible), fronted by AI Gateway. */
+  selfHosted: SelfHostedModel[];
   /** Per-user daily free LLM-call allowance (DAILY_LLM_CALL_LIMIT). */
   dailyLimit: number;
   /** Loaded hourly rate in dollars, used to convert recovered hours into ROI. */
@@ -206,6 +235,32 @@ export interface EcosystemModel {
   outputs: string;
   /** Honest gaps: what isn't captured yet, and what that costs — never oversells. */
   gaps: string[];
+}
+
+/** One derived routing rule: a self-hosted model and the task class it should serve. */
+export interface RoutingRule {
+  /** The self-hosted model name this rule routes to. */
+  model: string;
+  /** Plain-language rule, e.g. "PII / regulated tasks route here — prompts never leave client infrastructure". */
+  rule: string;
+}
+
+/**
+ * The resolved inference topology for a client: which tiers exist (cloud, self-hosted,
+ * or both) and how work is split across them. Pure — derived from the record.
+ */
+export interface InferencePlan {
+  mode: InferenceMode;
+  /** The client-hosted tiers in play (empty in pure-cloud mode). */
+  selfHosted: SelfHostedModel[];
+  /** True when at least one self-hosted tier is active (mode is hybrid or self-hosted). */
+  hybrid: boolean;
+  /** True when a hosted/cloud tier is still in play (everything except fully self-hosted). */
+  cloudTier: boolean;
+  /** Driver-derived routing rules: what runs on the client-hosted tier and why. */
+  routing: RoutingRule[];
+  /** Honest advisories (e.g. mode says hybrid but no endpoint captured; Ollama vs vLLM throughput). */
+  notes: string[];
 }
 
 /** One step of the generated build guide. Bodies are Markdown. */

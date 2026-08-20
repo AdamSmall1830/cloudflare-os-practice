@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { buildGuideMarkdown, buildSteps, deploymentJsonc } from "../src/build-guide.js";
 import { blankClient, hqClient } from "../src/seed.js";
+import type { ClientRecord } from "../src/types.js";
+
+function hybridClient(): ClientRecord {
+  const c = hqClient();
+  c.inferenceMode = "hybrid";
+  c.selfHosted = [{ name: "Llama-3.3-70B — client DC", engine: "vllm", drivers: ["residency", "cost"], existing: false }];
+  return c;
+}
 
 describe("buildSteps", () => {
   it("generates the HQ guide with system steps in wave order", () => {
@@ -99,5 +107,36 @@ describe("buildGuideMarkdown", () => {
     expect(md).toContain("## 1. Prepare your machine");
     expect(md).toContain("## 21. Pilot readiness — final gate");
     expect(md.match(/> \*\*You know it worked when:\*\*/g)).toHaveLength(21);
+  });
+});
+
+describe("self-hosted inference build steps", () => {
+  it("adds serve/tunnel/route steps only for hybrid clients, right after the gateway step", () => {
+    const cloud = buildSteps(hqClient()).map((s) => s.id);
+    expect(cloud).not.toContain("selfhost");
+
+    const ids = buildSteps(hybridClient()).map((s) => s.id);
+    expect(ids).toContain("selfhost");
+    expect(ids).toContain("selfhost-tunnel");
+    expect(ids).toContain("selfhost-route");
+    expect(ids.indexOf("selfhost")).toBe(ids.indexOf("gateway") + 1);
+  });
+
+  it("emits the vLLM serve command + LMCache note and driver-derived routing", () => {
+    const steps = buildSteps(hybridClient());
+    const serve = steps.find((s) => s.id === "selfhost");
+    expect(serve?.code).toContain("vllm serve");
+    expect(serve?.code).toContain("LMCache");
+    const route = steps.find((s) => s.id === "selfhost-route");
+    expect(route?.body).toContain("no per-token API fees"); // cost driver → routing rule
+    expect(route?.body).toContain("dynamic/"); // wired into the same Dynamic Route
+  });
+
+  it("skips the stand-up command when the endpoint already exists", () => {
+    const c = hybridClient();
+    c.selfHosted = [{ name: "Client vLLM", engine: "vllm", drivers: ["residency"], existing: true }];
+    const serve = buildSteps(c).find((s) => s.id === "selfhost");
+    expect(serve?.code).toBeUndefined();
+    expect(serve?.body).toContain("Confirm the existing endpoint");
   });
 });

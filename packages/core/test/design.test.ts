@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { designModel, ecosystemModel, hostnameFor, scopeMarkdown, stagingFor } from "../src/design.js";
+import { designModel, ecosystemModel, hostnameFor, inferencePlan, scopeMarkdown, stagingFor } from "../src/design.js";
 import { blankClient, hqClient } from "../src/seed.js";
+import type { SelfHostedModel } from "../src/types.js";
 
 describe("designModel", () => {
   it("uses manual pilot flags when present", () => {
@@ -124,6 +125,61 @@ describe("ecosystemModel", () => {
     const hq = ecosystemModel(designModel(hqClient()));
     expect(hq.gaps.some((g) => g.includes("No knowledge sources"))).toBe(false);
     expect(hq.gaps.some((g) => g.toLowerCase().includes("curation"))).toBe(true);
+  });
+
+  it("adds a self-hosted governance bullet when inference is hybrid", () => {
+    const c = hqClient();
+    c.inferenceMode = "hybrid";
+    c.selfHosted = [{ name: "Local-70B", engine: "vllm", drivers: ["residency"], existing: false }];
+    const gov = ecosystemModel(designModel(c)).governance.join(" ");
+    expect(gov).toContain("sensitive inference stays on client-operated models");
+    expect(gov).toContain("Local-70B");
+  });
+});
+
+describe("inferencePlan", () => {
+  const withSelfHost = (mode: "hybrid" | "self-hosted", selfHosted: SelfHostedModel[]) => {
+    const c = hqClient();
+    c.inferenceMode = mode;
+    c.selfHosted = selfHosted;
+    return c;
+  };
+
+  it("is pure-cloud by default", () => {
+    const inf = inferencePlan(hqClient());
+    expect(inf.hybrid).toBe(false);
+    expect(inf.cloudTier).toBe(true);
+    expect(inf.routing).toHaveLength(0);
+    expect(inf.selfHosted).toHaveLength(0);
+  });
+
+  it("derives one routing rule per driver, keeping the cloud tier in hybrid mode", () => {
+    const inf = inferencePlan(withSelfHost("hybrid", [{ name: "Local-70B", engine: "vllm", drivers: ["residency", "cost"], existing: false }]));
+    expect(inf.hybrid).toBe(true);
+    expect(inf.cloudTier).toBe(true);
+    expect(inf.routing.map((r) => r.model)).toEqual(["Local-70B", "Local-70B"]);
+    expect(inf.routing.some((r) => r.rule.includes("never leave client infrastructure"))).toBe(true);
+    expect(inf.routing.some((r) => r.rule.includes("no per-token API fees"))).toBe(true);
+  });
+
+  it("drops the cloud tier and warns to size for peak when fully self-hosted", () => {
+    const inf = inferencePlan(withSelfHost("self-hosted", [{ name: "Local", engine: "vllm", drivers: ["offline"], existing: false }]));
+    expect(inf.cloudTier).toBe(false);
+    expect(inf.notes.some((n) => n.includes("no burst-to-cloud"))).toBe(true);
+  });
+
+  it("notes an unspecified endpoint and Ollama's throughput ceiling", () => {
+    expect(inferencePlan(withSelfHost("hybrid", [])).notes.some((n) => n.includes("no client-hosted endpoint"))).toBe(true);
+    const ollama = inferencePlan(withSelfHost("hybrid", [{ name: "Ollama box", engine: "ollama", drivers: ["latency"], existing: true }]));
+    expect(ollama.notes.some((n) => n.includes("vLLM"))).toBe(true);
+  });
+
+  it("surfaces the topology in the scope document", () => {
+    const c = withSelfHost("hybrid", [{ name: "Local-70B", engine: "vllm", drivers: ["residency"], existing: false }]);
+    const md = scopeMarkdown(designModel(c), { date: "2026-08-20" });
+    expect(md).toContain("## Inference topology");
+    expect(md).toContain("Local-70B");
+    expect(md).toContain("AI Gateway");
   });
 });
 

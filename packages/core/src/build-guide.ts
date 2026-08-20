@@ -1,5 +1,5 @@
-import { SYSTEMS, VERTICALS } from "./catalogs.js";
-import { hostnameFor, stagingFor } from "./design.js";
+import { SELF_HOST_ENGINES, SYSTEMS, VERTICALS } from "./catalogs.js";
+import { hostnameFor, inferencePlan, stagingFor } from "./design.js";
 import { effectiveDailyLimit, slug } from "./scoring.js";
 import type { BuildStep, ClientRecord } from "./types.js";
 
@@ -26,6 +26,7 @@ export function buildSteps(c: ClientRecord): BuildStep[] {
   const admins = c.adminEmails || "you@yourfirm.com";
   const vertical = VERTICALS[c.vertical];
   const regulated = c.vertical === "law" || c.vertical === "finserv" || c.vertical === "pt";
+  const inf = inferencePlan(c);
   const steps: BuildStep[] = [];
 
   steps.push({
@@ -150,6 +151,66 @@ DAILY_LLM_CALL_LIMIT=${effectiveDailyLimit(c.dailyLimit)}`,
     verify:
       "Ask the workspace agent anything; the request appears in AI Gateway logs with attribution. Set a team budget alert at 80%. If using a Dynamic Route, a cheap-tier-tagged request resolves to the cheap model, and exceeding a team budget falls back rather than erroring.",
   });
+
+  if (inf.hybrid) {
+    const first = inf.selfHosted[0];
+    const anyStandUp = inf.selfHosted.some((s) => !s.existing);
+    const wantsLmcache = inf.selfHosted.some((s) => s.engine === "vllm");
+    const infHost = `infer.${c.domain || "client-domain.com"}`;
+
+    steps.push({
+      id: "selfhost",
+      title: "Stand up the client-hosted model endpoint",
+      body: `This deployment runs a ${inf.mode === "self-hosted" ? "fully self-hosted" : "hybrid"} inference topology: ${inf.selfHosted.map((s) => `**${s.name}** (${SELF_HOST_ENGINES[s.engine]}${s.existing ? ", already running" : ""})`).join(", ")}. Each model serves an **OpenAI-compatible** API on the client's own hardware; nothing about the model changes the Cloudflare OS architecture — it becomes just another tier behind AI Gateway.
+
+${anyStandUp ? "**Serve the model (vLLM reference).** On the client's GPU box (Linux + NVIDIA):" : "**Confirm the existing endpoint.** You already have an OpenAI-compatible endpoint — capture its base URL + API key, verify it answers `/v1/models`, and continue to the Tunnel step."}`,
+      code: anyStandUp
+        ? `# vLLM — OpenAI-compatible server, gated by an API key, bound to localhost
+pip install vllm
+export VLLM_API_KEY=$(openssl rand -hex 24)   # store this as a secret
+vllm serve <model-id> \\
+  --served-model-name ${first?.name || "client-model"} \\
+  --api-key "$VLLM_API_KEY" \\
+  --host 127.0.0.1 --port 8000${
+    wantsLmcache
+      ? `
+
+# Optional — reuse KV cache across RAG / multi-turn (cuts prefill + time-to-first-token).
+# Install LMCache and run vLLM with its KV connector. Use the current syntax from
+# LMCache's vLLM integration docs — the connector name/flags move between versions:
+#   pip install lmcache
+#   vllm serve ...  --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'`
+      : ""
+  }`
+        : undefined,
+      verify: `\`curl -H "Authorization: Bearer $VLLM_API_KEY" http://127.0.0.1:8000/v1/models\` on the box lists the served model.`,
+    });
+
+    steps.push({
+      id: "selfhost-tunnel",
+      title: "Expose it to Cloudflare over a private Tunnel",
+      body: `AI Gateway must reach the endpoint, but the GPU box should never open a public port. A **named Cloudflare Tunnel** gives it a stable hostname with no inbound firewall change:`,
+      code: `# On the box (install cloudflared first):
+cloudflared tunnel login
+cloudflared tunnel create ${sl}-inference
+cloudflared tunnel route dns ${sl}-inference ${infHost}
+# Point the tunnel at the local model port (run as a service in production):
+cloudflared tunnel --url http://127.0.0.1:8000 run ${sl}-inference`,
+      verify: `\`https://${infHost}/v1/models\` answers (with the API key) from off the box, while the box has **no** inbound ports open. Add a WAF rate-limit rule on \`infer.*\` — it is the only reachable surface of the model.`,
+    });
+
+    steps.push({
+      id: "selfhost-route",
+      title: "Route the self-hosted tier through AI Gateway",
+      body: `Register the endpoint as a tier in the same \`dynamic/${sl}\` route from the AI Gateway step, so it inherits budgets, logging, Guardrails, and per-user attribution — hybrid becomes pure routing:
+1. In the \`dynamic/${sl}\` Dynamic Route, add a **Model** node targeting the self-hosted endpoint: OpenAI-compatible base URL \`https://${infHost}/v1\`, auth = the model's API key (stored as a gateway secret, sent as the bearer token).
+2. Add a **Conditional** node that routes by task-class metadata to the self-hosted node:
+${inf.routing.map((r) => `   - ${r.rule}`).join("\n")}
+${inf.cloudTier ? "3. Everything else falls through to the hosted cloud tier (the Model nodes from the gateway step)." : "3. There is **no** cloud fallback — every task resolves to a self-hosted node (fully self-hosted mode)."}
+4. Publish the route version. Re-tuning the split later is a new version — no Cloudflare OS redeploy.${inf.notes.length ? `\n\n${inf.notes.map((n) => `> ${n}`).join("\n")}` : ""}`,
+      verify: `A request tagged with a self-hosted task class shows in AI Gateway logs hitting the self-hosted model${inf.cloudTier ? "; a cloud-class request still hits the hosted provider" : " (and there is no cloud tier)"}; both carry per-user attribution and pass Guardrails.`,
+    });
+  }
 
   steps.push({
     id: "brand",

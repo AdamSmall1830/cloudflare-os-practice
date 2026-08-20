@@ -59,6 +59,7 @@ Key fields and what they drive:
 | `vertical` | Which systems appear, starter use cases, guardrail policy (`manufacturing · law · finserv · salesmkt · pt · agency · other`) |
 | `idp` (`access`/`google`/`password`), `domainOnCf` | Which sign-in and DNS steps the build guide emits |
 | `provider`, `dailyLimit`, `hourlyRate` | AI Gateway env block; ROI dollar anchor (`hourlyRate` invalid → $50 fallback) |
+| `inferenceMode` (`cloud`/`hybrid`/`self-hosted`), `selfHosted[]` (`{name,engine,drivers,existing}`) | Inference topology. Non-cloud → `inferencePlan()` derives driver-based routing and the build guide emits serve/tunnel/route steps (vLLM behind AI Gateway over a Tunnel). Drivers: `residency·compliance·cost·latency·offline` |
 | `systems[]` | Integration map + one build-guide step per system (catalog: `catalogs.ts` SYSTEMS) |
 | `mcpRoutes{id:bool}` | Routes a custom system through an MCP Server Portal: portal step instead of gatekeeper build, no code stub, portal-held credential in the baseline |
 | `knowledge[]` (`{name,type,owner}`) | Retrieval plan: `sops`→R2+AI Search · `wiki`→its gatekeeper · `templates`→doc templates · `data`→live gatekeeper reads |
@@ -70,6 +71,8 @@ Key fields and what they drive:
 
 ```ts
 designModel(client)        // → pilots, integration split (stock/mcpRouted/customBuild), workflows, totalHrs/totalValue, timeline
+ecosystemModel(model)      // → the three feeding layers (methods/knowledge/systems) + governance frame + honest gaps
+inferencePlan(client)      // → inference topology: mode, hybrid/cloudTier flags, driver-derived routing rules, honest notes
 scopeMarkdown(model, {date}) // → proposal-ready markdown (pass date for deterministic output)
 buildSteps(client)         // → ordered BuildStep[] (21 for the HQ record); buildGuideMarkdown() renders SETUP.md
 deploymentJsonc(client)    // → starter-template config with real values or explicit <PASTE …> placeholders

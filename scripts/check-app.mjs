@@ -75,6 +75,7 @@ const MIRROR_PINS = [
   ["AI evidence schema", '"evidence":"short quote/pointer from the corpus"'],
   ["two-pass critique prompt", "function aiCritiquePrompt("],
   ["ecosystem synthesis", "function ecosystemModel("],
+  ["inference topology", "function inferencePlan("],
   ["slug trailing-hyphen re-strip", '.slice(0,24).replace(/-+$/,"")'],
   ["compliance framework map (HIPAA)", "HIPAA (45 CFR Parts 160 & 164)"],
 ];
